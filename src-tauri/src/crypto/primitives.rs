@@ -10,6 +10,7 @@ use sha2::Sha256;
 use zeroize::Zeroizing;
 
 use super::secret::Kek;
+use super::secret::Vdk;
 
 pub const AES_NONCE_LENGTH: usize = 12;
 pub const AES_TAG_LENGTH: usize = 16;
@@ -145,6 +146,46 @@ pub(crate) fn decrypt_vdk(
     let mut output = [0_u8; 32];
     output.copy_from_slice(&plaintext);
     Ok(output)
+}
+
+pub(crate) fn encrypt_payload(
+    vdk: &Vdk,
+    nonce: &[u8; AES_NONCE_LENGTH],
+    plaintext: &[u8],
+    aad: &[u8],
+) -> CryptoResult<Vec<u8>> {
+    let cipher = Aes256Gcm::new_from_slice(vdk.expose()).map_err(|_| CryptoError::InvalidInput)?;
+    cipher
+        .encrypt(
+            nonce.into(),
+            Payload {
+                msg: plaintext,
+                aad,
+            },
+        )
+        .map_err(|_| CryptoError::AuthenticationFailed)
+}
+
+pub(crate) fn decrypt_payload(
+    vdk: &Vdk,
+    nonce: &[u8; AES_NONCE_LENGTH],
+    ciphertext: &[u8],
+    aad: &[u8],
+) -> CryptoResult<Zeroizing<Vec<u8>>> {
+    if ciphertext.len() < AES_TAG_LENGTH {
+        return Err(CryptoError::InvalidFormat);
+    }
+    let cipher = Aes256Gcm::new_from_slice(vdk.expose()).map_err(|_| CryptoError::InvalidInput)?;
+    cipher
+        .decrypt(
+            nonce.into(),
+            Payload {
+                msg: ciphertext,
+                aad,
+            },
+        )
+        .map(Zeroizing::new)
+        .map_err(|_| CryptoError::AuthenticationFailed)
 }
 
 #[cfg(test)]

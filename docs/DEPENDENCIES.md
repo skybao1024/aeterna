@@ -124,3 +124,32 @@ fixed error mapping around them. Global hooks, raw input, ETW, undocumented
 Winlogon signals, shell commands, and additional wrapper crates were rejected.
 Real-Windows build and behavior validation is intentionally deferred until the
 complete application is available and must not be inferred from macOS checks.
+
+## I05 approved SQLite dependency
+
+Approval date: 2026-09-21. The user explicitly approved the exact dependency,
+feature set, native surface, schema/container design, and migration policy in
+[`research/I05-vault-format-and-dependency-proposal.md`](./research/I05-vault-format-and-dependency-proposal.md)
+before implementation.
+
+| Dependency                              | Scope and enabled features                            | Purpose and review result                                                                                                                                       |
+| --------------------------------------- | ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `rusqlite` 0.40.2                       | Runtime; defaults off; `backup`, `bundled`, `limits`  | Narrow synchronous SQLite ownership, online migration-backup support, and hostile-input limits. MIT; no runtime network behavior or WebView API.                |
+| `libsqlite3-sys` 0.38.2 / SQLite 3.53.2 | Transitive native runtime/build; bundled amalgamation | One exact SQLite baseline across supported hosts. The sys crate is MIT and SQLite is public domain. Its C/FFI and build-script surface is reviewed again at G1. |
+
+The lockfile added exactly the approved expected packages: `rusqlite 0.40.2`,
+`libsqlite3-sys 0.38.2`, `fallible-iterator 0.3.0`,
+`fallible-streaming-iterator 0.1.9`, and the build-only `vcpkg 0.2.15` helper.
+Already-resolved `bitflags`, `smallvec`, `cc`, and `pkg-config` satisfy the
+remaining edges. No OpenSSL, SQLCipher, bindgen, async runtime, URL, pool,
+serialization, virtual-table, hook, or WebAssembly feature was selected.
+
+The bundled C build contains SQLite's load-extension capability, but the
+`rusqlite` load-extension feature is disabled and Aeterna exposes neither a
+generic SQL endpoint nor an extension-loading API. Aeterna adds no project
+`unsafe` for SQLite. ATTACH create/write are disabled through safe connection
+configuration and all ATTACH is independently capped by `SQLITE_LIMIT_ATTACHED=0`;
+defensive mode, untrusted schema, disabled triggers/views/double-quoted string
+literals, fixed limits, and static parameterized SQL further constrain the
+native boundary. The repository adds no entitlement, operating-system
+permission, telemetry, updater, remote service, or runtime network path.

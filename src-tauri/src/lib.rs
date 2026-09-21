@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 pub mod activity;
 pub mod crypto;
 pub mod secure_storage;
+pub mod vault;
 #[cfg(target_os = "windows")]
 pub mod windows_dev;
 

@@ -160,7 +160,7 @@ pub fn create_master_wrapper(
     create_master_wrapper_with_material(password, vdk, context, profile, salt, nonce)
 }
 
-fn create_master_wrapper_with_material(
+pub(crate) fn create_master_wrapper_with_material(
     password: &MasterPassword,
     vdk: &Vdk,
     context: WrapContext,
@@ -217,7 +217,7 @@ pub fn create_recovery_wrapper(
     create_recovery_wrapper_with_nonce(erc, recovery_salt, vdk, context, nonce)
 }
 
-fn create_recovery_wrapper_with_nonce(
+pub(crate) fn create_recovery_wrapper_with_nonce(
     erc: &ErcEntropy,
     recovery_salt: &RecoverySalt,
     vdk: &Vdk,

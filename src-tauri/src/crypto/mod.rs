@@ -26,5 +26,11 @@ pub use signing::{
     verify_message,
 };
 
+pub(crate) use hierarchy::{
+    create_master_wrapper_with_material, create_recovery_wrapper_with_nonce,
+};
+pub(crate) use primitives::{decrypt_payload, encrypt_payload, fill_random};
+pub(crate) use secret::MasterSalt;
+
 pub const CRYPTO_FORMAT_VERSION: u16 = 1;
 pub const ERC_FORMAT_VERSION: u8 = 1;
