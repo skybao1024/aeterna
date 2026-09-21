@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "main-foundation",
+  "description": "Allows the main local window to call only the I00 foundation smoke command.",
+  "windows": ["main"],
+  "permissions": ["allow-check-desktop-foundation"]
+}

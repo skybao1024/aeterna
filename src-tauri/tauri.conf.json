@@ -1,0 +1,64 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Aeterna",
+  "version": "0.0.0-dev",
+  "identifier": "dev.aeterna.desktop.foundation",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://127.0.0.1:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "withGlobalTauri": false,
+    "windows": [
+      {
+        "label": "main",
+        "title": "Aeterna",
+        "width": 1040,
+        "height": 720,
+        "minWidth": 720,
+        "minHeight": 560,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ],
+    "security": {
+      "capabilities": ["main-foundation"],
+      "freezePrototype": true,
+      "assetProtocol": {
+        "enable": false,
+        "scope": []
+      },
+      "dangerousDisableAssetCspModification": false,
+      "csp": {
+        "default-src": "'self'",
+        "connect-src": "ipc: http://ipc.localhost",
+        "font-src": "'self'",
+        "img-src": "'self' data:",
+        "style-src": "'self'",
+        "script-src": "'self'",
+        "object-src": "'none'",
+        "frame-src": "'none'",
+        "base-uri": "'none'",
+        "form-action": "'none'"
+      },
+      "devCsp": {
+        "default-src": "'self' http://127.0.0.1:1420",
+        "connect-src": "ipc: http://ipc.localhost http://127.0.0.1:1420 ws://127.0.0.1:1420",
+        "font-src": "'self' http://127.0.0.1:1420",
+        "img-src": "'self' data: http://127.0.0.1:1420",
+        "style-src": "'self' 'unsafe-inline' http://127.0.0.1:1420",
+        "script-src": "'self' http://127.0.0.1:1420",
+        "object-src": "'none'",
+        "frame-src": "'none'",
+        "base-uri": "'none'",
+        "form-action": "'none'"
+      }
+    }
+  },
+  "bundle": {
+    "active": false,
+    "icon": ["icons/512x512.png"]
+  }
+}

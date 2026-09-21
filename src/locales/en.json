@@ -1,0 +1,31 @@
+{
+  "app": {
+    "brand": "Aeterna",
+    "windowTitle": "Aeterna development foundation",
+    "eyebrow": "Desktop engineering foundation",
+    "title": "A quiet foundation for work that must endure.",
+    "description": "This development shell proves the local React, Rust, and Tauri boundary without implementing product features."
+  },
+  "locale": {
+    "label": "Language",
+    "current": "English",
+    "switch": "Switch to Simplified Chinese",
+    "switchLabel": "Language: Switch to Simplified Chinese"
+  },
+  "ipc": {
+    "label": "Native boundary",
+    "contributor": "Contributor",
+    "checking": "Checking the narrow Rust command…",
+    "ready": "Native IPC is ready for {{name}}.",
+    "unavailable": "Native IPC is unavailable in this environment."
+  },
+  "foundation": {
+    "iteration": "I00",
+    "label": "I00 scope",
+    "items": {
+      "local": "Local assets only",
+      "permissions": "Least-privilege capabilities",
+      "toolchain": "Pinned toolchains"
+    }
+  }
+}

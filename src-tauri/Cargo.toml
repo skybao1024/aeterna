@@ -1,0 +1,61 @@
+[package]
+name = "aeterna-desktop"
+version = "0.0.0-dev"
+description = "Development-only desktop engineering foundation for Aeterna"
+authors = ["Aeterna contributors"]
+edition = "2024"
+rust-version = "1.98.1"
+publish = false
+default-run = "aeterna-desktop"
+
+[features]
+activity-prototype = []
+
+[lib]
+name = "aeterna_lib"
+crate-type = ["lib", "cdylib", "staticlib"]
+
+[build-dependencies]
+tauri-build = { version = "=2.6.3", features = [] }
+
+[dependencies]
+aes-gcm = { version = "=0.10.3", default-features = false, features = ["aes", "alloc", "zeroize"] }
+argon2 = { version = "=0.5.3", default-features = false, features = ["zeroize"] }
+bech32 = { version = "=0.12.0", default-features = false, features = ["alloc"] }
+ed25519-dalek = { version = "=2.2.0", default-features = false, features = ["fast", "zeroize"] }
+getrandom = { version = "=0.3.4", default-features = false }
+hkdf = { version = "=0.12.4", default-features = false }
+serde = { version = "=1.0.228", features = ["derive"] }
+sha2 = { version = "=0.10.9", default-features = false }
+tauri = { version = "=2.11.6", features = [] }
+zeroize = { version = "=1.9.0", default-features = false, features = ["alloc"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+core-foundation = { version = "=0.10.1", features = ["link"] }
+objc2 = { version = "=0.6.4", default-features = false, features = ["std"] }
+objc2-app-kit = { version = "=0.3.2", default-features = false, features = ["std", "NSWorkspace"] }
+objc2-core-graphics = { version = "=0.3.2", default-features = false, features = ["std", "CGEventSource", "CGEventTypes"] }
+objc2-foundation = { version = "=0.3.2", default-features = false, features = ["std", "NSNotification", "NSObject", "NSString"] }
+security-framework-sys = { version = "=2.17.0", features = ["OSX_10_15"] }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows-sys = { version = "=0.61.2", default-features = false, features = [
+  "Win32_Foundation",
+  "Win32_Security_Credentials",
+  "Win32_System_LibraryLoader",
+  "Win32_System_Power",
+  "Win32_System_Registry",
+  "Win32_System_RemoteDesktop",
+  "Win32_System_SystemInformation",
+  "Win32_UI_Input_KeyboardAndMouse",
+  "Win32_UI_WindowsAndMessaging",
+] }
+
+[dev-dependencies]
+serde_json = "=1.0.151"
+
+[profile.release]
+panic = "abort"
+codegen-units = 1
+lto = true
+strip = true
