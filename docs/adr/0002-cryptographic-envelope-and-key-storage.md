@@ -1,8 +1,9 @@
 # ADR 0002: Cryptographic primitives and versioned key wrappers
 
-- Status: Proposed — G0 recommends implementation-scoped acceptance after the final digest and baseline checkpoint are approved
+- Status: Accepted by G0 for implementation scope
 - Date: 2026-09-21
 - Decision owner: G0 architecture and security review
+- Approval: Explicit user approval recorded in G0 on 2026-09-21
 - Evidence: [`../research/I02-crypto-results.md`](../research/I02-crypto-results.md)
 - Dependency review: [`../research/I02-crypto-dependency-proposal.md`](../research/I02-crypto-dependency-proposal.md)
 
@@ -32,7 +33,7 @@ migration ownership are split into
 [ADR 0005](./0005-vault-format-and-migration-ownership.md). Independent review
 remains a G1 release gate and is not a prerequisite circularly imposed on I05.
 
-## Proposed decision
+## Decision
 
 Generate one 256-bit VDK from the operating-system CSPRNG. Never derive the VDK
 from a password or ERC. Wrap the same VDK independently:
@@ -197,13 +198,13 @@ prototype failed closed with `secure_storage_missing_entitlement`; it did not
 fall back to another store. The Personal Team profile is time-limited prototype
 evidence, not a production signing or distribution decision.
 
-G0 recommends accepting the algorithms, exact primitive pins, size and resource
-bounds, wrapper-purpose separation, AAD/HKDF encodings, fail-closed errors, and
+G0 accepts the algorithms, exact primitive pins, size and resource bounds,
+wrapper-purpose separation, AAD/HKDF encodings, fail-closed errors, and
 version-rejection rules as the implementation basis for I05. The Apple Silicon
 profile E remains a provisional development recommendation whose parameters
 must be persisted explicitly; it is not a universal release default.
 
-Acceptance at G0 would not claim an external audit or production freeze. The
+Acceptance at G0 does not claim an external audit or production freeze. The
 following owners remain explicit:
 
 1. ADR 0004 and I09 own production device-key storage use; I15 owns final
@@ -217,6 +218,6 @@ following owners remain explicit:
 5. G1 owns independent cryptographic, dependency, native-storage,
    side-channel, fuzzing, and penetration review before release.
 
-Until the user approves the G0 digest and the reviewed baseline is checkpointed,
-this ADR remains Proposed even though I02 is Accepted. No I05 implementation is
-included in this decision record.
+The approved client baseline is preserved at
+`54a213c5e17f5e1e3eae183f17f1f2370aa7a61d`. No I05 implementation is included
+in this decision record.

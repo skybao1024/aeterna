@@ -1,8 +1,9 @@
 # ADR 0006: Public protocol ownership and versioning direction
 
-- Status: Proposed — G0 decision digest pending
+- Status: Accepted by G0 for ownership and versioning direction
 - Date: 2026-09-21
 - Decision owner: G0 for ownership and versioning direction; I09 for protocol v1 details
+- Approval: Explicit user approval recorded in G0 on 2026-09-21
 
 ## Context
 
@@ -12,7 +13,7 @@ Rust implementation types may silently become the public contract. I03 is an
 internal state-machine prototype and exposes no route, so it does not define a
 heartbeat, device, recovery, or notification protocol.
 
-## Proposed decision
+## Decision
 
 The public client repository owns the protocol source of truth. I09 must add a
 versioned public protocol package containing machine-readable request and

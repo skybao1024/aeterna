@@ -1,8 +1,9 @@
 # ADR 0004: macOS device-key storage and identity continuity
 
-- Status: Proposed — G0 decision digest pending
+- Status: Accepted by G0 for the storage boundary
 - Date: 2026-09-21
 - Decision owner: G0 for the storage boundary; I09 and I15 for production use and release identity
+- Approval: Explicit user approval recorded in G0 on 2026-09-21
 - Evidence: [`../research/I02-crypto-results.md`](../research/I02-crypto-results.md)
 - Dependency review: [`../research/I02-crypto-dependency-proposal.md`](../research/I02-crypto-dependency-proposal.md)
 
@@ -21,7 +22,7 @@ vault storage and does not register devices or send signed network requests.
 They must nevertheless be fixed and tested before I09/I10 rely on a production
 device identity and before I15 ships an artifact.
 
-## Proposed decision
+## Decision
 
 Use one generic-password item in the macOS Data Protection Keychain with:
 
@@ -81,7 +82,7 @@ the gap is closed and the real Keychain matrix is rerun.
 
 ## Consequences
 
-- G0 may accept the storage architecture without choosing a release identity.
+- G0 accepts the storage architecture without choosing a release identity.
 - I05 may proceed without device registration or production Keychain identity.
 - I09/I10 cannot use a persisted signing key until metadata validation and the
   versioned namespace are implemented and tested.

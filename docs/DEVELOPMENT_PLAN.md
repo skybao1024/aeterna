@@ -64,7 +64,7 @@ Status values are `Pending`, `In Progress`, `Blocked`, and `Accepted`.
 | I02 | Cryptography and secure-storage risk prototype       | Client     | I00                                                 | Versioned test vectors, KDF benchmark, dual unwrap paths, and Keychain evidence      | Accepted |
 | I03 | Control-plane concurrency risk prototype             | Server     | Current cleanup baseline reviewed; Docker available | Deterministic state-machine and race tests pass in PostgreSQL                        | Accepted |
 | I04 | Windows activity and secure-storage risk prototype   | Client     | I00; Windows test host                              | Windows session/input/Credential Manager matrix passes                               | In Progress |
-| G0  | macOS Phase 0 architecture and security gate         | Both       | I01-I03; approved I04 implementation checkpoint     | macOS-scope ADRs approved; deferred decisions assigned to explicit later gates        | In Progress |
+| G0  | macOS Phase 0 architecture and security gate         | Both       | I01-I03; approved I04 implementation checkpoint     | macOS-scope ADRs approved; deferred decisions assigned to explicit later gates        | Accepted |
 | I05 | Versioned vault format and encrypted storage core    | Client     | G0                                                  | Local encrypted records survive restart and tampering is rejected                    | Pending |
 | I06 | Vault item and bounded-attachment MVP                | Client     | I05                                                 | User can create, edit, read, and delete encrypted local content                      | Pending |
 | I07 | Atomic encrypted export and import                   | Client     | I05-I06                                             | Interruption and tampering tests pass; restored vault matches source                 | Pending |
@@ -165,11 +165,12 @@ checkpoint, then approve only the decisions required for the macOS-first path:
 - state-machine transaction and outage semantics;
 - the public protocol/versioning approach and verification commands.
 
-The G0 proposal targets Apple Silicon macOS 15.0. Real native evidence currently
-covers macOS 26.3, so I08 must run the activity, lifecycle, secure-storage,
-fast-user-switch, and KDF matrix on the floor and current macOS before a support
-claim. G0 may authorize local-only I05 work because I05 neither productionizes
-the activity agent nor binds a network device identity.
+G0 accepts Apple Silicon macOS 15.0 as the initial product/test target. Real
+native evidence currently covers macOS 26.3, so I08 must run the activity,
+lifecycle, secure-storage, fast-user-switch, and KDF matrix on the floor and
+current macOS before a support claim. G0 authorizes local-only I05 work because
+I05 neither productionizes the activity agent nor binds a network device
+identity.
 
 G0 splits the former ADR 0002 scope into: cryptographic primitives and wrappers
 in ADR 0002; macOS Keychain/signing-identity continuity in ADR 0004; vault
@@ -325,15 +326,12 @@ freeze or validate security assumptions that automated tests cannot certify.
   begin before they pass. A macOS build, cross-build, CI compilation, mock, or
   waiver is not Windows acceptance evidence.
 - Docker must be running before server tests, migrations, or service diagnostics.
-- The accepted I03 implementation is still uncommitted in a detached worktree
-  at server base `d9dd7cb7e03e6b869d1068e24703d53a817b4b42`; the authoritative
-  server `dev` checkout remains clean at that base. G0 cannot be Accepted until
-  an explicitly authorized I03 checkpoint commit is fast-forwarded into that
-  checkout.
-- The complete client Phase 0 tree has no commit. G0 cannot be Accepted until
-  an explicitly authorized root checkpoint commit makes the reviewed baseline
-  recoverable.
-- The proposed Apple Silicon macOS 15.0 floor has build-runner coverage only in
+- I03 is preserved on `codex/i03-concurrency-checkpoint` and integrated by
+  fast-forward into authoritative server `dev` at
+  `9873e418909d52885ee4b4c61ae3a6d16f5beff6`.
+- The complete reviewed client Phase 0 baseline is preserved at root commit
+  `54a213c5e17f5e1e3eae183f17f1f2370aa7a61d`.
+- The accepted Apple Silicon macOS 15.0 floor has build-runner coverage only in
   configuration, not executed native behavior evidence. I08 owns the
   minimum-floor and current-release matrices before any support claim.
 - Production provider, region, retention, quota, and final default timing choices
@@ -360,3 +358,4 @@ evidence.
 - 2026-09-21: The author approved a macOS-first release sequence. G0 now governs only the macOS path and depends on I01-I03 plus the approved I04 implementation checkpoint. I04 remains In Progress with unchanged real-Windows criteria, and GW blocks every Windows production hardening, packaging, support claim, and release. Missing Windows evidence was not converted into a waiver or Pass.
 - 2026-09-21: macOS G0 started in task `01a0c30a-8bf6-76a1-b994-9398e5adf229`. The gate reviews and reconciles I01-I03 evidence, the I04 shared-interface checkpoint, ADR scope, protocol ownership, and source-control baseline integrity. It cannot approve Windows behavior or start I05, and it requires a separate explicit user approval digest before acceptance.
 - 2026-09-21: G0 review evidence and proposed ADR splits were prepared in task `01a0c30a-8bf6-76a1-b994-9398e5adf229`. Fresh pinned client checks passed 7 frontend and 54 Rust tests and the unsigned desktop build; fresh real-PostgreSQL I03 checks passed 12 focused and 35 total backend tests, Alembic current/check, focused Black/isort, and repository critical Flake8. The destructive migration downgrade was not repeated without separate approval; the accepted I03 run retains its prior downgrade/upgrade evidence. G0 remains In Progress pending explicit digest approval and recoverable client/server checkpoint commits. I04 and GW remain incomplete.
+- 2026-09-21: G0 accepted by explicit user approval in task `01a0c30a-8bf6-76a1-b994-9398e5adf229`. Client root checkpoint `54a213c5e17f5e1e3eae183f17f1f2370aa7a61d` preserves the reviewed Phase 0 baseline. Server checkpoint `9873e418909d52885ee4b4c61ae3a6d16f5beff6` is on `codex/i03-concurrency-checkpoint` and was fast-forwarded into clean authoritative `dev`; post-integration Alembic current/check, 12 focused and 35 total PostgreSQL tests, focused Black/isort, and critical Flake8 passed. ADRs 0001, 0002, and 0004-0006 are Accepted; the server ADR is Accepted. Apple Silicon macOS 15.0 is the initial product/test target subject to I08 native qualification. I05 is next eligible. I04 and GW remain incomplete.

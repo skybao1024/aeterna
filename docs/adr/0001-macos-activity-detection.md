@@ -1,8 +1,9 @@
 # ADR 0001: macOS activity detection
 
-- Status: Proposed — G0 recommends acceptance after the final digest and baseline checkpoint are approved
+- Status: Accepted by G0
 - Date: 2026-09-21
 - Decision owner: G0 architecture and security review
+- Approval: Explicit user approval recorded in G0 on 2026-09-21
 - Evidence: [`../research/I01-macos-activity-results.md`](../research/I01-macos-activity-results.md)
 
 ## Context
@@ -32,7 +33,7 @@ showed that Screen Sharing advances both Quartz sources on the target host. On
 valid user activity; the boundary is therefore HID-class interaction in the
 unlocked target session, not proof of local physical presence.
 
-## Proposed decision
+## Decision
 
 Keep three boundaries:
 
@@ -149,8 +150,8 @@ physical hardware input.
   synchronization attributes. I08 must fail closed on unexpected sentinel
   metadata before this adapter becomes a production activity agent.
 - Real activity and Keychain evidence currently covers one Apple Silicon host
-  on macOS 26.3. The proposed product floor is Apple Silicon macOS 15.0, but
-  I08 must replay the activity, lifecycle, fast-user-switch, and sentinel
+  on macOS 26.3. The accepted product/test target is Apple Silicon macOS 15.0,
+  but I08 must replay the activity, lifecycle, fast-user-switch, and sentinel
   metadata matrix on that floor and on the then-current macOS release before a
   support claim is made.
 
@@ -162,7 +163,7 @@ signed target-host evidence validate the boundary. Screen Sharing evidence also
 confirms the approved rule that HID-class remote interaction counts while
 Combined-only input does not.
 
-This ADR must remain Proposed and I01 must return to Blocked if any mandatory
+This decision becomes invalid and I01 must return to Blocked if any mandatory
 scenario shows one of the following:
 
 1. the Keychain sentinel remains accessible while the screen is locked;
@@ -173,10 +174,9 @@ scenario shows one of the following:
 
 ## G0 disposition and remaining verification
 
-G0 recommends accepting the activity policy, remote-session semantic, privacy
-boundary, and fail-closed lifecycle design. This recommendation does not become
-an Accepted ADR until the user approves the G0 digest and the reviewed client
-baseline has a recoverable commit reference.
+G0 accepts the activity policy, remote-session semantic, privacy boundary, and
+fail-closed lifecycle design. Client baseline commit
+`54a213c5e17f5e1e3eae183f17f1f2370aa7a61d` preserves the reviewed evidence.
 
 The M10 fast-user-switch scenario and M13 manual wall-clock scenario remain
 explicit Phase 0 waivers, not Pass results. I08 owns a real fast-user-switch

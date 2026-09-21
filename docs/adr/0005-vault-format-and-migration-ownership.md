@@ -1,8 +1,9 @@
 # ADR 0005: Vault format and migration ownership
 
-- Status: Proposed — G0 decision digest pending
+- Status: Accepted by G0 for ownership and invariants
 - Date: 2026-09-21
 - Decision owner: G0 for ownership and invariants; I05 and I07 for exact formats
+- Approval: Explicit user approval recorded in G0 on 2026-09-21
 - Inputs: [ADR 0002](./0002-cryptographic-envelope-and-key-storage.md), [`../DESIGN.md`](../DESIGN.md)
 
 ## Context
@@ -14,7 +15,7 @@ fixture as a production container would skip migration, crash-safety, rollback,
 and size-limit decisions. Requiring a final container before I05 would be
 circular because I05 is the iteration that must design and test it.
 
-## Proposed decision
+## Decision
 
 G0 fixes ownership and invariants, not the final serialization:
 

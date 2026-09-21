@@ -94,8 +94,8 @@ see [`research/I02-crypto-results.md`](./research/I02-crypto-results.md).
 
 ### G0 dependency disposition
 
-G0 recommends accepting the exact primitive pins and restricted feature sets
-above as the implementation basis for I05. This is not an independent audit, a
+G0 accepts the exact primitive pins and restricted feature sets above as the
+implementation basis for I05. This is not an independent audit, a
 production dependency freeze, or approval of a persistence container. ADR 0002
 owns primitive and wrapper semantics; ADR 0004 owns macOS Keychain policy and
 identity continuity; ADR 0005 owns the I05/I07 container and migration decision
@@ -103,7 +103,7 @@ boundaries. G1 must repeat vulnerability, maintenance, license, native-storage,
 side-channel, and supply-chain review before release.
 
 The provisional Argon2 profile is valid only as an explicitly persisted
-Apple-Silicon development profile until I08 validates the proposed macOS 15
+Apple-Silicon development profile until I08 validates the accepted macOS 15
 floor and the current macOS release under realistic application memory load.
 No new dependency is approved by G0.
 

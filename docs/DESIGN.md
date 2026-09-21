@@ -41,14 +41,13 @@ The first production desktop release is macOS-only. Platform-neutral vault,
 protocol, and control-plane work may proceed after the macOS Phase 0 gate, but
 that gate does not qualify, advertise, or authorize a Windows release.
 
-G0 proposes Apple Silicon macOS 15.0 as the initial product and test floor.
+G0 accepts Apple Silicon macOS 15.0 as the initial product and test floor.
 Current real-machine activity, Keychain, and Argon2 evidence covers macOS 26.3
-only; the configured macOS 15 CI job has not run from the uncommitted Phase 0
-baseline. I08 must complete the native activity, lifecycle, secure-storage, and
+only; the configured macOS 15 CI job has not run for the Phase 0 checkpoint.
+I08 must complete the native activity, lifecycle, secure-storage, and
 KDF matrix on an updated macOS 15 host and on the then-current macOS release
 before Aeterna makes that support claim. If the floor cannot pass, it must be
-raised to the oldest fully verified major version. This proposal remains
-subject to the final G0 digest approval.
+raised to the oldest fully verified major version.
 
 The Windows implementation remains a risk-prototype checkpoint until a real
 interactive supported Windows host completes the activity, Credential Manager,
@@ -896,7 +895,7 @@ public endpoints.
 - CSPRNG：VDK、ERC、SRS、nonce 和 Token
 - `secrecy` / `zeroize`：内存秘密生命周期
 
-The G0 implementation decision may accept exact pinned primitive crates,
+The G0 implementation decision accepts exact pinned primitive crates,
 bounded versioned wrapper semantics, and a provisional hardware-specific KDF
 profile so I05 can proceed. It does not freeze a production container, release
 KDF default, signing identity, or UX and does not claim an independent audit.
@@ -1009,10 +1008,10 @@ fuzzing, and penetration review before release. 禁止使用已弃用的
 
 以下事项不会改变核心架构，但必须在生产发布前通过原型、用户测试或商业决策确定：
 
-1. The initial production release supports macOS only. G0 proposes an Apple
-   Silicon macOS 15.0 product/test floor, subject to explicit digest approval
-   and the I08 minimum-floor/current-release native matrix. GW decides the later
-   Windows floor independently.
+1. The initial production release supports macOS only. G0 accepts an Apple
+   Silicon macOS 15.0 product/test floor, subject to the I08
+   minimum-floor/current-release native matrix before a support claim. GW
+   decides the later Windows floor independently.
 2. 不活跃期限、预警期和宽限期的默认值与最小值。
 3. 每账户最大设备数和联系人数量。
 4. 大附件的受审计流式加密格式与 v1 文件大小上限。
