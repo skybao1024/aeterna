@@ -12,10 +12,14 @@ import { Button } from "./components/ui/button";
 import { DEFAULT_LOCALE, persistLocale, type SupportedLocale } from "./i18n";
 import {
   cancelAttachment,
+  cancelTransfer,
+  chooseVaultExport,
+  chooseVaultImport,
   commitAttachment,
   createItem,
   deleteItem,
   getItem,
+  getTransferStatus,
   getVaultStatus,
   initializeVault,
   type ItemDraft,
@@ -26,6 +30,9 @@ import {
   prepareAttachment,
   readAttachment,
   removeAttachment,
+  startVaultExport,
+  startVaultImport,
+  type TransferStatus,
   unlockVault,
   updateItem,
   type VaultItem,
@@ -57,6 +64,20 @@ interface AttachmentPreview {
   truncated: boolean;
 }
 
+interface ActiveTransfer {
+  operationId: string;
+  status: TransferStatus;
+}
+
+const INITIAL_TRANSFER_STATUS: TransferStatus = {
+  kind: "export",
+  state: "running",
+  phase: "preparing",
+  bytesProcessed: "0",
+  entriesProcessed: "0",
+  cancellable: true,
+};
+
 const EMPTY_DRAFT: ItemDraft = {
   kind: "note",
   title: "",
@@ -82,6 +103,10 @@ export function App() {
   const [attachmentTarget, setAttachmentTarget] =
     useState<AttachmentTarget | null>(null);
   const [preview, setPreview] = useState<AttachmentPreview | null>(null);
+  const [activeTransfer, setActiveTransfer] = useState<ActiveTransfer | null>(
+    null,
+  );
+  const [lastExportAt, setLastExportAt] = useState<Date | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const confirmationInvokerRef = useRef<HTMLElement | null>(null);
   const lockingRef = useRef(false);
@@ -130,6 +155,48 @@ export function App() {
       window.removeEventListener("beforeunload", preventClose);
     };
   }, [dirty]);
+
+  useEffect(() => {
+    if (!activeTransfer || isTerminalTransfer(activeTransfer.status.state)) {
+      return;
+    }
+    let active = true;
+    const timer = window.setTimeout(() => {
+      void getTransferStatus(activeTransfer.operationId)
+        .then((status) => {
+          if (!active) return;
+          setActiveTransfer({
+            operationId: activeTransfer.operationId,
+            status,
+          });
+          if (status.state === "completed") {
+            if (status.kind === "import") {
+              sessionEpoch.current += 1;
+              setActiveItem(null);
+              setDraft(EMPTY_DRAFT);
+              setDirty(false);
+              setPreview(null);
+              setAttachmentTarget(null);
+              setItems([]);
+              setPassword("");
+              setPasswordConfirmation("");
+              setPhase("locked");
+            } else {
+              setLastExportAt(new Date());
+            }
+          } else if (status.state === "failed" && status.errorCode) {
+            setErrorCode(status.errorCode);
+          }
+        })
+        .catch((error: unknown) => {
+          if (active) setErrorCode(errorCodeFrom(error));
+        });
+    }, 250);
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [activeTransfer]);
 
   const loadSummaries = async () => {
     const epoch = sessionEpoch.current;
@@ -272,6 +339,94 @@ export function App() {
       .finally(() => {
         lockingRef.current = false;
         setBusy(false);
+      });
+  };
+
+  const chooseExport = () => {
+    withDiscardConfirmation(() => {
+      if (dirty) clearEditor();
+      void runBusy(async () => {
+        const selection = await chooseVaultExport();
+        if (selection.outcome === "cancelled") return;
+        openConfirmation(
+          {
+            title: t("transfer.exportConfirmTitle"),
+            description: t("transfer.exportConfirmDescription"),
+            confirmLabel: t("actions.exportVault"),
+            destructive: false,
+          },
+          () => {
+            void runBusy(async () => {
+              const operationId = await startVaultExport(selection.selectionId);
+              setActiveTransfer({
+                operationId,
+                status: INITIAL_TRANSFER_STATUS,
+              });
+            });
+          },
+        );
+      });
+    });
+  };
+
+  const chooseImport = () => {
+    if (!password) {
+      setErrorCode("vault_invalid_input");
+      return;
+    }
+    const submittedPassword = password;
+    void runBusy(async () => {
+      const selection = await chooseVaultImport();
+      if (selection.outcome === "cancelled") return;
+      openConfirmation(
+        {
+          title: t("transfer.importConfirmTitle"),
+          description: t("transfer.importConfirmDescription"),
+          confirmLabel: t("actions.importVault"),
+          destructive: false,
+        },
+        () => {
+          setPassword("");
+          setPasswordConfirmation("");
+          void runBusy(async () => {
+            const operationId = await startVaultImport(
+              selection.selectionId,
+              submittedPassword,
+            );
+            setActiveTransfer({
+              operationId,
+              status: {
+                ...INITIAL_TRANSFER_STATUS,
+                kind: "import",
+                phase: "copying",
+              },
+            });
+          });
+        },
+      );
+    });
+  };
+
+  const cancelActiveTransfer = () => {
+    if (!activeTransfer?.status.cancellable) return;
+    void cancelTransfer(activeTransfer.operationId)
+      .then(() => {
+        setActiveTransfer((current) =>
+          current
+            ? {
+                ...current,
+                status: {
+                  ...current.status,
+                  state: "cancelling",
+                  phase: "cancelling",
+                  cancellable: false,
+                },
+              }
+            : null,
+        );
+      })
+      .catch((error: unknown) => {
+        setErrorCode(errorCodeFrom(error));
       });
   };
 
@@ -447,14 +602,23 @@ export function App() {
           </div>
           <div className="flex items-center gap-2">
             {phase === "unlocked" ? (
-              <Button
-                variant="secondary"
-                onClick={() => {
-                  withDiscardConfirmation(performLock);
-                }}
-              >
-                {t("actions.lock")}
-              </Button>
+              <>
+                <Button
+                  variant="secondary"
+                  disabled={busy || activeTransfer !== null}
+                  onClick={chooseExport}
+                >
+                  {t("actions.exportVault")}
+                </Button>
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    withDiscardConfirmation(performLock);
+                  }}
+                >
+                  {t("actions.lock")}
+                </Button>
+              </>
             ) : null}
             <Button
               aria-label={t("locale.switchLabel")}
@@ -492,6 +656,7 @@ export function App() {
           onPassword={setPassword}
           onConfirmation={setPasswordConfirmation}
           onSubmit={submitPassword}
+          onImport={chooseImport}
         />
       ) : null}
       {phase === "unlocked" ? (
@@ -501,6 +666,16 @@ export function App() {
             className="rounded-xl border border-amber-300/25 bg-amber-300/10 px-4 py-3 text-sm leading-6 text-amber-100 lg:col-span-2"
           >
             {t("setup.warning")}
+            {lastExportAt ? (
+              <span className="mt-2 block text-xs text-amber-100/75">
+                {t("transfer.lastExport", {
+                  date: new Intl.DateTimeFormat(currentLocale, {
+                    dateStyle: "medium",
+                    timeStyle: "short",
+                  }).format(lastExportAt),
+                })}
+              </span>
+            ) : null}
           </div>
           <aside className="rounded-2xl border border-white/10 bg-white/[0.035] p-4">
             <div className="flex items-center justify-between gap-3">
@@ -597,6 +772,19 @@ export function App() {
           }
         />
       ) : null}
+
+      {activeTransfer ? (
+        <TransferDialog
+          transfer={activeTransfer}
+          locale={currentLocale}
+          onCancel={cancelActiveTransfer}
+          onClose={() => {
+            if (isTerminalTransfer(activeTransfer.status.state)) {
+              setActiveTransfer(null);
+            }
+          }}
+        />
+      ) : null}
     </main>
   );
 }
@@ -609,6 +797,7 @@ function PasswordPanel({
   onPassword,
   onConfirmation,
   onSubmit,
+  onImport,
 }: {
   phase: "uninitialized" | "locked";
   password: string;
@@ -617,6 +806,7 @@ function PasswordPanel({
   onPassword: (value: string) => void;
   onConfirmation: (value: string) => void;
   onSubmit: (event: SyntheticEvent<HTMLFormElement>) => void;
+  onImport: () => void;
 }) {
   const { t } = useTranslation();
   const initializing = phase === "uninitialized";
@@ -678,6 +868,22 @@ function PasswordPanel({
           <Button className="w-full" disabled={busy} type="submit">
             {t(initializing ? "actions.initialize" : "actions.unlock")}
           </Button>
+          {initializing ? (
+            <div className="border-t border-white/10 pt-4">
+              <p className="text-xs leading-5 text-stone-400">
+                {t("transfer.importWarning")}
+              </p>
+              <Button
+                className="mt-3 w-full"
+                disabled={busy || password.length === 0}
+                type="button"
+                variant="secondary"
+                onClick={onImport}
+              >
+                {t("actions.importVault")}
+              </Button>
+            </div>
+          ) : null}
         </form>
       </div>
     </section>
@@ -1034,12 +1240,90 @@ function ConfirmDialog({
   );
 }
 
+function TransferDialog({
+  transfer,
+  locale,
+  onCancel,
+  onClose,
+}: {
+  transfer: ActiveTransfer;
+  locale: SupportedLocale;
+  onCancel: () => void;
+  onClose: () => void;
+}) {
+  const { t } = useTranslation();
+  const { status } = transfer;
+  const terminal = isTerminalTransfer(status.state);
+  const bytes = formatBytes(status.bytesProcessed, locale);
+  const entries = new Intl.NumberFormat(locale).format(
+    Number(status.entriesProcessed),
+  );
+  return (
+    <div className="fixed inset-0 z-[60] grid place-items-center bg-black/75 p-5">
+      <section
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="transfer-title"
+        aria-describedby="transfer-description"
+        onKeyDown={(event) => {
+          if (event.key !== "Escape") return;
+          event.preventDefault();
+          if (status.cancellable) onCancel();
+          else if (terminal) onClose();
+        }}
+        className="w-full max-w-md rounded-2xl border border-white/10 bg-stone-900 p-6 shadow-2xl"
+      >
+        <h2 id="transfer-title" className="font-serif text-2xl">
+          {t(`transfer.${status.kind}Title`)}
+        </h2>
+        <p
+          id="transfer-description"
+          className="mt-3 text-sm text-stone-400"
+          aria-live="polite"
+        >
+          {t(`transfer.phases.${status.phase}`)}
+        </p>
+        <div className="mt-5 h-2 overflow-hidden rounded-full bg-white/10">
+          <div
+            className={`h-full bg-amber-300 transition-all ${terminal ? "w-full" : "w-2/3 animate-pulse"}`}
+          />
+        </div>
+        <p className="mt-3 text-xs text-stone-500">
+          {t("transfer.progress", { bytes, entries })}
+        </p>
+        <p className="sr-only" role="status" aria-live="polite">
+          {t(`transfer.states.${status.state}`)}
+        </p>
+        <div className="mt-6 flex justify-end">
+          {status.cancellable ? (
+            <Button autoFocus variant="secondary" onClick={onCancel}>
+              {t("actions.cancelTransfer")}
+            </Button>
+          ) : terminal ? (
+            <Button autoFocus onClick={onClose}>
+              {t("actions.close")}
+            </Button>
+          ) : (
+            <Button variant="secondary" disabled>
+              {t("transfer.states.cancelling")}
+            </Button>
+          )}
+        </div>
+      </section>
+    </div>
+  );
+}
+
 function CenteredMessage({ children }: { children: ReactNode }) {
   return (
     <section className="grid min-h-[calc(100vh-6rem)] place-items-center px-5 text-stone-400">
       <p role="status">{children}</p>
     </section>
   );
+}
+
+function isTerminalTransfer(state: TransferStatus["state"]): boolean {
+  return state === "completed" || state === "cancelled" || state === "failed";
 }
 
 function draftFromItem(item: VaultItem): ItemDraft {
@@ -1074,10 +1358,23 @@ function localizedError(t: (key: string) => string, code: string): string {
     "vault_invalid_format",
     "vault_invalid_input",
     "vault_io_error",
+    "vault_export_limit_exceeded",
+    "vault_export_target_exists",
+    "vault_import_invalid_package",
+    "vault_import_limit_exceeded",
+    "vault_import_target_exists",
+    "vault_import_unsupported_version",
     "vault_item_invalid_format",
     "vault_item_unsupported_version",
     "vault_locked",
     "vault_not_found",
+    "vault_operation_cancelled",
+    "vault_operation_in_progress",
+    "vault_operation_not_cancellable",
+    "vault_operation_not_found",
+    "vault_path_rejected",
+    "vault_platform_unsupported",
+    "vault_selection_not_found",
     "vault_uninitialized",
     "vault_unsupported_version",
     "vault_upload_not_found",

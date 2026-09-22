@@ -153,3 +153,23 @@ defensive mode, untrusted schema, disabled triggers/views/double-quoted string
 literals, fixed limits, and static parameterized SQL further constrain the
 native boundary. The repository adds no entitlement, operating-system
 permission, telemetry, updater, remote service, or runtime network path.
+
+## I07 approved macOS file-panel and filesystem boundary
+
+Approval date: 2026-09-22. The user explicitly approved the exact native and
+format proposal in
+[`research/I07-export-import-format-and-dependency-proposal.md`](./research/I07-export-import-format-and-dependency-proposal.md),
+including the corrected 15-byte canonical migration identifier.
+
+| Dependency / feature change             | Scope                                                                                                                                                              | Purpose and review result                                                                                                                                                                                                                                                                                                      |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `libc` 0.2.189                          | Direct macOS-only runtime pin; defaults off                                                                                                                        | Exposes only `open`, `openat`, `fstat`, `fstatat`, `fchmod`, `fsync`, `linkat`, `unlinkat`, and `geteuid` behind one audited module for no-follow, descriptor-relative, mode-0600, no-replace publication. MIT OR Apache-2.0; already present transitively in the accepted lockfile; no network behavior or permission prompt. |
+| `objc2-app-kit` 0.3.2 feature expansion | Existing exact macOS binding; adds `NSApplication`, `NSOpenPanel`, `NSPanel`, `NSResponder`, `NSSavePanel`, and `NSWindow` while retaining `std` and `NSWorkspace` | Uses the public AppKit open/save panels for one selected `.aeterna-vault` file. Zlib OR Apache-2.0 OR MIT; no Tauri plugin, entitlement, runtime download, or network behavior.                                                                                                                                                |
+
+I07 adds no npm package, archive/compression/serialization crate, cryptographic
+crate, filesystem/dialog/shell plugin, broad capability, entitlement, remote
+service, telemetry path, or updater. It reuses the exact accepted
+`aes-gcm`/`hkdf`/`sha2` primitives and the existing `rusqlite` repository. The
+project-owned `unsafe` code is confined to the small macOS syscall adapter;
+Objective-C lifetime and main-thread rules remain owned by the generated
+`objc2` bindings.

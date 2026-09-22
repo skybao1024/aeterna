@@ -4,6 +4,37 @@ export const MAX_ATTACHMENT_BYTES = 786_432;
 
 export type VaultState = "uninitialized" | "locked" | "unlocked";
 export type ItemKind = "note" | "instruction";
+export type TransferKind = "export" | "import";
+export type TransferState =
+  "running" | "cancelling" | "completed" | "cancelled" | "failed";
+export type TransferPhase =
+  | "choosing"
+  | "preparing"
+  | "snapshotting"
+  | "writing"
+  | "copying"
+  | "validating"
+  | "authenticating"
+  | "reconstructing"
+  | "verifying"
+  | "publishing"
+  | "cancelling"
+  | "completed"
+  | "cancelled"
+  | "failed";
+
+export type FileSelection =
+  { outcome: "selected"; selectionId: string } | { outcome: "cancelled" };
+
+export interface TransferStatus {
+  kind: TransferKind;
+  state: TransferState;
+  phase: TransferPhase;
+  bytesProcessed: string;
+  entriesProcessed: string;
+  cancellable: boolean;
+  errorCode?: string;
+}
 
 export interface ItemDraft {
   kind: ItemKind;
@@ -67,6 +98,42 @@ export async function unlockVault(password: string): Promise<void> {
 
 export async function lockVault(): Promise<void> {
   await expectStateResponse("vault_lock", {}, "locked");
+}
+
+export async function chooseVaultExport(): Promise<FileSelection> {
+  return chooseTransferFile("vault_export_choose");
+}
+
+export async function startVaultExport(selectionId: string): Promise<string> {
+  return startTransfer("vault_export_start", { selectionId });
+}
+
+export async function chooseVaultImport(): Promise<FileSelection> {
+  return chooseTransferFile("vault_import_choose");
+}
+
+export async function startVaultImport(
+  selectionId: string,
+  password: string,
+): Promise<string> {
+  return startTransfer("vault_import_start", { selectionId, password });
+}
+
+export async function getTransferStatus(
+  operationId: string,
+): Promise<TransferStatus> {
+  const response = await invokeSafely("vault_transfer_status", { operationId });
+  if (!isTransferStatus(response)) {
+    throw new VaultIpcError("ipc_invalid_response");
+  }
+  return response;
+}
+
+export async function cancelTransfer(operationId: string): Promise<void> {
+  const response = await invokeSafely("vault_transfer_cancel", { operationId });
+  if (!isRecord(response) || response.state !== "cancelling") {
+    throw new VaultIpcError("ipc_invalid_response");
+  }
 }
 
 export async function listItems(): Promise<ItemSummary[]> {
@@ -204,6 +271,31 @@ async function expectStateResponse(
   }
 }
 
+async function chooseTransferFile(command: string): Promise<FileSelection> {
+  const response = await invokeSafely(command, {});
+  if (!isRecord(response)) {
+    throw new VaultIpcError("ipc_invalid_response");
+  }
+  if (response.outcome === "cancelled") {
+    return { outcome: "cancelled" };
+  }
+  if (response.outcome === "selected" && isCanonicalId(response.selectionId)) {
+    return { outcome: "selected", selectionId: response.selectionId };
+  }
+  throw new VaultIpcError("ipc_invalid_response");
+}
+
+async function startTransfer(
+  command: string,
+  request: Record<string, unknown>,
+): Promise<string> {
+  const response = await invokeSafely(command, request);
+  if (!isRecord(response) || !isCanonicalId(response.operationId)) {
+    throw new VaultIpcError("ipc_invalid_response");
+  }
+  return response.operationId;
+}
+
 async function invokeForItem(
   command: string,
   request: Record<string, unknown>,
@@ -243,6 +335,42 @@ function normalizeInvokeError(error: unknown): VaultIpcError {
 function isVaultState(value: unknown): value is VaultState {
   return (
     value === "uninitialized" || value === "locked" || value === "unlocked"
+  );
+}
+
+function isTransferStatus(value: unknown): value is TransferStatus {
+  if (!isRecord(value)) {
+    return false;
+  }
+  const errorCodeValid =
+    value.errorCode === undefined ||
+    (typeof value.errorCode === "string" &&
+      /^[a-z][a-z0-9_]{2,63}$/.test(value.errorCode));
+  return (
+    (value.kind === "export" || value.kind === "import") &&
+    ["running", "cancelling", "completed", "cancelled", "failed"].includes(
+      String(value.state),
+    ) &&
+    [
+      "choosing",
+      "preparing",
+      "snapshotting",
+      "writing",
+      "copying",
+      "validating",
+      "authenticating",
+      "reconstructing",
+      "verifying",
+      "publishing",
+      "cancelling",
+      "completed",
+      "cancelled",
+      "failed",
+    ].includes(String(value.phase)) &&
+    isNonnegativeDecimal(value.bytesProcessed) &&
+    isNonnegativeDecimal(value.entriesProcessed) &&
+    typeof value.cancellable === "boolean" &&
+    errorCodeValid
   );
 }
 

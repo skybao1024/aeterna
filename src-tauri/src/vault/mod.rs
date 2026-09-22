@@ -6,8 +6,11 @@
 mod error;
 mod format;
 mod item;
+#[cfg(target_os = "macos")]
+mod macos_fs;
 mod migration;
 mod repository;
+mod transfer;
 
 pub use error::{VaultError, VaultResult};
 pub use format::MAX_PLAINTEXT_LENGTH;
@@ -20,4 +23,7 @@ pub use item::{
 pub use repository::{
     DecryptedRecord, RecordId, RecordVersion, RecoveryMaterial, UnlockedVault, VaultBootstrap,
     VaultRepository,
+};
+pub(crate) use transfer::{
+    TransferError, TransferObserver, cleanup_stale_import_artifacts, export_vault, import_vault,
 };

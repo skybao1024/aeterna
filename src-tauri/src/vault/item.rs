@@ -8,7 +8,7 @@ use super::{
 };
 
 const ITEM_MAGIC: [u8; 8] = *b"AETRITM\0";
-const ITEM_PAYLOAD_VERSION: u16 = 1;
+pub(super) const ITEM_PAYLOAD_VERSION: u16 = 1;
 const ITEM_FLAGS: u8 = 0;
 const ITEM_HEADER_LENGTH: usize = 30;
 const ATTACHMENT_HEADER_LENGTH: usize = 24;
@@ -555,6 +555,10 @@ fn decode_item(bytes: &[u8]) -> VaultResult<DecodedItem> {
         body,
         attachments,
     })
+}
+
+pub(super) fn validate_item_payload(bytes: &[u8]) -> VaultResult<()> {
+    decode_item(bytes).map(drop)
 }
 
 struct DecodedItem {

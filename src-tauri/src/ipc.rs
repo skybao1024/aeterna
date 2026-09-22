@@ -1,7 +1,11 @@
 use std::{
     fs,
     path::{Path, PathBuf},
-    sync::{Mutex, MutexGuard},
+    sync::{
+        Arc, Mutex, MutexGuard,
+        atomic::{AtomicBool, Ordering},
+    },
+    thread::{self, JoinHandle},
     time::{Duration, Instant},
 };
 
@@ -16,15 +20,20 @@ use crate::{
     crypto::{Argon2Profile, MasterPassword, fill_random},
     vault::{
         AttachmentId, ItemDraft, ItemKind, ItemSummary, MAX_ATTACHMENT_BYTES, MAX_ATTACHMENT_COUNT,
-        RecordId, UnlockedVault, VaultAttachment, VaultError, VaultItem, VaultRepository,
+        RecordId, TransferError, TransferObserver, UnlockedVault, VaultAttachment, VaultError,
+        VaultItem, VaultRepository, cleanup_stale_import_artifacts, export_vault, import_vault,
         validate_attachment_input,
     },
 };
+
+#[cfg(target_os = "macos")]
+use crate::file_panel::{self, PanelOutcome};
 
 const VAULT_DIRECTORY_NAME: &str = "vault";
 const VAULT_FILE_NAME: &str = "aeterna-vault.sqlite3";
 const UPLOAD_HEADER: &str = "x-aeterna-upload-id";
 const UPLOAD_TTL: Duration = Duration::from_secs(300);
+const TRANSFER_TTL: Duration = Duration::from_secs(300);
 const DEVELOPMENT_ARGON2_PROFILE: Argon2Profile = Argon2Profile::new(262_144, 2, 1);
 
 pub(crate) struct VaultAppState {
@@ -35,6 +44,9 @@ pub(crate) struct VaultAppState {
 struct AppStateInner {
     session: SessionState,
     pending_upload: Option<PendingUpload>,
+    selection: Option<FileSelection>,
+    transfer: Option<TransferOperation>,
+    session_epoch: u64,
 }
 
 enum SessionState {
@@ -42,8 +54,108 @@ enum SessionState {
     Locked(VaultRepository),
     Unlocked {
         repository: VaultRepository,
-        vault: UnlockedVault,
+        vault: Arc<UnlockedVault>,
     },
+}
+
+#[derive(Clone, Copy, Eq, PartialEq)]
+enum TransferKind {
+    Export,
+    Import,
+}
+
+struct FileSelection {
+    id: [u8; 16],
+    kind: TransferKind,
+    path: PathBuf,
+    session_epoch: u64,
+    expires_at: Instant,
+}
+
+struct TransferOperation {
+    id: [u8; 16],
+    kind: TransferKind,
+    reporter: TransferReporter,
+    handle: Option<JoinHandle<()>>,
+}
+
+#[derive(Clone)]
+struct TransferReporter {
+    cancel: Arc<AtomicBool>,
+    progress: Arc<Mutex<TransferProgress>>,
+}
+
+struct TransferProgress {
+    state: &'static str,
+    phase: &'static str,
+    bytes: u64,
+    entries: u64,
+    cancellable: bool,
+    error: Option<TransferError>,
+    terminal_at: Option<Instant>,
+}
+
+impl TransferReporter {
+    fn new() -> Self {
+        Self {
+            cancel: Arc::new(AtomicBool::new(false)),
+            progress: Arc::new(Mutex::new(TransferProgress {
+                state: "running",
+                phase: "preparing",
+                bytes: 0,
+                entries: 0,
+                cancellable: true,
+                error: None,
+                terminal_at: None,
+            })),
+        }
+    }
+
+    fn finish(&self, result: Result<(), TransferError>) {
+        let Ok(mut progress) = self.progress.lock() else {
+            return;
+        };
+        progress.cancellable = false;
+        progress.terminal_at = Some(Instant::now());
+        match result {
+            Ok(()) => {
+                progress.state = "completed";
+                progress.phase = "completed";
+            }
+            Err(TransferError::Cancelled) => {
+                progress.state = "cancelled";
+                progress.phase = "cancelled";
+                progress.error = Some(TransferError::Cancelled);
+            }
+            Err(error) => {
+                progress.state = "failed";
+                progress.phase = "failed";
+                progress.error = Some(error);
+            }
+        }
+    }
+}
+
+impl TransferObserver for TransferReporter {
+    fn update(&self, phase: &'static str, bytes: u64, entries: u64, cancellable: bool) {
+        let Ok(mut progress) = self.progress.lock() else {
+            return;
+        };
+        if progress.terminal_at.is_some() {
+            return;
+        }
+        progress.phase = phase;
+        progress.bytes = progress.bytes.max(bytes);
+        progress.entries = progress.entries.max(entries);
+        progress.cancellable = cancellable;
+        if phase == "cancelling" {
+            progress.state = "cancelling";
+        }
+    }
+
+    fn is_cancelled(&self) -> bool {
+        self.cancel.load(Ordering::Acquire)
+    }
 }
 
 struct PendingUpload {
@@ -73,6 +185,7 @@ impl VaultAppState {
         let path = app_local_data_directory
             .join(VAULT_DIRECTORY_NAME)
             .join(VAULT_FILE_NAME);
+        cleanup_stale_import_artifacts(&path);
         let session = if path.try_exists().map_err(|_| VaultError::Io)? {
             SessionState::Locked(VaultRepository::open(&path)?)
         } else {
@@ -83,6 +196,9 @@ impl VaultAppState {
             inner: Mutex::new(AppStateInner {
                 session,
                 pending_upload: None,
+                selection: None,
+                transfer: None,
+                session_epoch: 0,
             }),
         })
     }
@@ -102,6 +218,12 @@ pub(crate) struct IpcError {
 
 impl From<VaultError> for IpcError {
     fn from(error: VaultError) -> Self {
+        Self { code: error.code() }
+    }
+}
+
+impl From<TransferError> for IpcError {
+    fn from(error: TransferError) -> Self {
         Self { code: error.code() }
     }
 }
@@ -194,6 +316,25 @@ struct UploadIdRequest {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct SelectionIdRequest {
+    selection_id: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ImportStartRequest {
+    selection_id: String,
+    password: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct OperationIdRequest {
+    operation_id: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct AttachmentRequest {
     item_id: String,
     attachment_id: String,
@@ -223,6 +364,43 @@ pub(crate) struct CancelResponse {
 pub(crate) struct PrepareAttachmentResponse {
     upload_id: String,
     expires_in_seconds: u64,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase", tag = "outcome")]
+pub(crate) enum SelectionResponse {
+    #[serde(rename = "selected")]
+    Selected {
+        #[serde(rename = "selectionId")]
+        selection_id: String,
+    },
+    #[serde(rename = "cancelled")]
+    Cancelled,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct StartTransferResponse {
+    operation_id: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct TransferStatusResponse {
+    kind: &'static str,
+    state: &'static str,
+    phase: &'static str,
+    bytes_processed: String,
+    entries_processed: String,
+    cancellable: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    error_code: Option<&'static str>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct CancelTransferResponse {
+    state: &'static str,
 }
 
 #[derive(Serialize)]
@@ -284,7 +462,9 @@ pub(crate) fn vault_status(
 
 fn vault_status_impl(body: &InvokeBody, state: &VaultAppState) -> Result<StatusResponse, IpcError> {
     parse_json::<EmptyRequest>(body)?;
-    let inner = state.lock()?;
+    let mut inner = state.lock()?;
+    reconcile_transfer(&mut inner, &state.path)?;
+    clear_expired_selection(&mut inner);
     Ok(StatusResponse {
         state: state_name(&inner.session),
     })
@@ -305,6 +485,7 @@ fn vault_initialize_impl(
     let request = parse_json::<PasswordRequest>(body)?;
     let password = MasterPassword::new(request.password.into_bytes()).map_err(VaultError::from)?;
     let mut inner = state.lock()?;
+    prepare_new_transfer(&mut inner, &state.path)?;
     if !matches!(inner.session, SessionState::Uninitialized) {
         return Err(VaultError::AlreadyInitialized.into());
     }
@@ -319,9 +500,11 @@ fn vault_initialize_impl(
         })?;
     let (repository, recovery_material) = bootstrap.into_parts();
     drop(recovery_material);
-    let vault = repository.unlock(&password)?;
+    let vault = Arc::new(repository.unlock(&password)?);
     inner.session = SessionState::Unlocked { repository, vault };
     inner.pending_upload = None;
+    inner.selection = None;
+    inner.session_epoch = inner.session_epoch.wrapping_add(1);
     Ok(StatusResponse { state: "unlocked" })
 }
 
@@ -342,9 +525,11 @@ fn vault_unlock_impl(body: &InvokeBody, state: &VaultAppState) -> Result<StatusR
         SessionState::Locked(repository) => repository.clone(),
         SessionState::Unlocked { .. } => return Err(VaultError::InvalidInput.into()),
     };
-    let vault = repository.unlock(&password)?;
+    let vault = Arc::new(repository.unlock(&password)?);
     inner.session = SessionState::Unlocked { repository, vault };
     inner.pending_upload = None;
+    inner.selection = None;
+    inner.session_epoch = inner.session_epoch.wrapping_add(1);
     Ok(StatusResponse { state: "unlocked" })
 }
 
@@ -366,8 +551,30 @@ fn vault_lock_impl(body: &InvokeBody, state: &VaultAppState) -> Result<StatusRes
     };
     if let Some(repository) = replacement {
         inner.session = SessionState::Locked(repository);
+        inner.pending_upload = None;
+        inner.selection = None;
+        inner.session_epoch = inner.session_epoch.wrapping_add(1);
+        let handle = if let Some(transfer) = inner.transfer.as_mut() {
+            if transfer.kind == TransferKind::Export {
+                transfer.reporter.cancel.store(true, Ordering::Release);
+                transfer.reporter.update("cancelling", 0, 0, false);
+                transfer.handle.take()
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+        if let Some(handle) = handle {
+            drop(inner);
+            let _ = handle.join();
+            return Ok(StatusResponse { state: "locked" });
+        }
+    } else {
+        inner.pending_upload = None;
+        inner.selection = None;
+        inner.session_epoch = inner.session_epoch.wrapping_add(1);
     }
-    inner.pending_upload = None;
     Ok(StatusResponse { state: "locked" })
 }
 
@@ -685,6 +892,383 @@ fn vault_remove_attachment_impl(
     Ok(ItemResponseEnvelope {
         item: item_response(&item),
     })
+}
+
+#[tauri::command]
+pub(crate) fn vault_export_choose(
+    request: tauri::ipc::Request<'_>,
+    state: State<'_, VaultAppState>,
+) -> Result<SelectionResponse, IpcError> {
+    parse_json::<EmptyRequest>(request.body())?;
+    choose_file(state.inner(), TransferKind::Export)
+}
+
+#[tauri::command]
+pub(crate) fn vault_import_choose(
+    request: tauri::ipc::Request<'_>,
+    state: State<'_, VaultAppState>,
+) -> Result<SelectionResponse, IpcError> {
+    parse_json::<EmptyRequest>(request.body())?;
+    choose_file(state.inner(), TransferKind::Import)
+}
+
+#[tauri::command]
+pub(crate) fn vault_export_start(
+    request: tauri::ipc::Request<'_>,
+    state: State<'_, VaultAppState>,
+) -> Result<StartTransferResponse, IpcError> {
+    vault_export_start_impl(request.body(), state.inner())
+}
+
+fn vault_export_start_impl(
+    body: &InvokeBody,
+    state: &VaultAppState,
+) -> Result<StartTransferResponse, IpcError> {
+    let request = parse_json::<SelectionIdRequest>(body)?;
+    let selection_id = parse_hex_id(&request.selection_id)?;
+    let mut inner = state.lock()?;
+    prepare_new_transfer(&mut inner, &state.path)?;
+    let selection = consume_selection(&mut inner, selection_id, TransferKind::Export)?;
+    let vault = match &inner.session {
+        SessionState::Unlocked { vault, .. } => Arc::clone(vault),
+        SessionState::Locked(_) => return Err(VaultError::Locked.into()),
+        SessionState::Uninitialized => return Err(VaultError::Uninitialized.into()),
+    };
+    if selection.session_epoch != inner.session_epoch {
+        return Err(IpcError {
+            code: "vault_selection_not_found",
+        });
+    }
+    let operation_id = random_identifier()?;
+    let reporter = TransferReporter::new();
+    let worker_reporter = reporter.clone();
+    let path = selection.path;
+    let handle = thread::Builder::new()
+        .name("aeterna-export".to_owned())
+        .spawn(move || {
+            let result = export_vault(&vault, &path, &worker_reporter);
+            worker_reporter.finish(result);
+        })
+        .map_err(|_| IpcError::from(VaultError::Io))?;
+    inner.transfer = Some(TransferOperation {
+        id: operation_id,
+        kind: TransferKind::Export,
+        reporter,
+        handle: Some(handle),
+    });
+    Ok(StartTransferResponse {
+        operation_id: encode_hex(operation_id),
+    })
+}
+
+#[tauri::command]
+pub(crate) fn vault_import_start(
+    request: tauri::ipc::Request<'_>,
+    state: State<'_, VaultAppState>,
+) -> Result<StartTransferResponse, IpcError> {
+    vault_import_start_impl(request.body(), state.inner())
+}
+
+fn vault_import_start_impl(
+    body: &InvokeBody,
+    state: &VaultAppState,
+) -> Result<StartTransferResponse, IpcError> {
+    let request = parse_json::<ImportStartRequest>(body)?;
+    let selection_id = parse_hex_id(&request.selection_id)?;
+    let password = MasterPassword::new(request.password.into_bytes()).map_err(VaultError::from)?;
+    let mut inner = state.lock()?;
+    prepare_new_transfer(&mut inner, &state.path)?;
+    if !matches!(inner.session, SessionState::Uninitialized) {
+        return Err(VaultError::AlreadyInitialized.into());
+    }
+    let selection = consume_selection(&mut inner, selection_id, TransferKind::Import)?;
+    if selection.session_epoch != inner.session_epoch {
+        return Err(IpcError {
+            code: "vault_selection_not_found",
+        });
+    }
+    ensure_vault_directory(&state.path)?;
+    let operation_id = random_identifier()?;
+    let reporter = TransferReporter::new();
+    let worker_reporter = reporter.clone();
+    let path = selection.path;
+    let target = state.path.clone();
+    let handle = thread::Builder::new()
+        .name("aeterna-import".to_owned())
+        .spawn(move || {
+            let result = import_vault(&path, &target, &password, &worker_reporter);
+            worker_reporter.finish(result);
+        })
+        .map_err(|_| IpcError::from(VaultError::Io))?;
+    inner.transfer = Some(TransferOperation {
+        id: operation_id,
+        kind: TransferKind::Import,
+        reporter,
+        handle: Some(handle),
+    });
+    Ok(StartTransferResponse {
+        operation_id: encode_hex(operation_id),
+    })
+}
+
+#[tauri::command]
+pub(crate) fn vault_transfer_status(
+    request: tauri::ipc::Request<'_>,
+    state: State<'_, VaultAppState>,
+) -> Result<TransferStatusResponse, IpcError> {
+    vault_transfer_status_impl(request.body(), state.inner())
+}
+
+fn vault_transfer_status_impl(
+    body: &InvokeBody,
+    state: &VaultAppState,
+) -> Result<TransferStatusResponse, IpcError> {
+    let request = parse_json::<OperationIdRequest>(body)?;
+    let operation_id = parse_hex_id(&request.operation_id)?;
+    let mut inner = state.lock()?;
+    reconcile_transfer(&mut inner, &state.path)?;
+    let transfer = inner.transfer.as_ref().ok_or(IpcError {
+        code: "vault_operation_not_found",
+    })?;
+    if transfer.id != operation_id {
+        return Err(IpcError {
+            code: "vault_operation_not_found",
+        });
+    }
+    let progress = transfer
+        .reporter
+        .progress
+        .lock()
+        .map_err(|_| IpcError::from(VaultError::Internal))?;
+    Ok(TransferStatusResponse {
+        kind: transfer_kind_name(transfer.kind),
+        state: progress.state,
+        phase: progress.phase,
+        bytes_processed: progress.bytes.to_string(),
+        entries_processed: progress.entries.to_string(),
+        cancellable: progress.cancellable,
+        error_code: progress.error.map(TransferError::code),
+    })
+}
+
+#[tauri::command]
+pub(crate) fn vault_transfer_cancel(
+    request: tauri::ipc::Request<'_>,
+    state: State<'_, VaultAppState>,
+) -> Result<CancelTransferResponse, IpcError> {
+    vault_transfer_cancel_impl(request.body(), state.inner())
+}
+
+fn vault_transfer_cancel_impl(
+    body: &InvokeBody,
+    state: &VaultAppState,
+) -> Result<CancelTransferResponse, IpcError> {
+    let request = parse_json::<OperationIdRequest>(body)?;
+    let operation_id = parse_hex_id(&request.operation_id)?;
+    let mut inner = state.lock()?;
+    reconcile_transfer(&mut inner, &state.path)?;
+    let transfer = inner.transfer.as_mut().ok_or(IpcError {
+        code: "vault_operation_not_found",
+    })?;
+    if transfer.id != operation_id {
+        return Err(IpcError {
+            code: "vault_operation_not_found",
+        });
+    }
+    {
+        let progress = transfer
+            .reporter
+            .progress
+            .lock()
+            .map_err(|_| IpcError::from(VaultError::Internal))?;
+        if !progress.cancellable || progress.terminal_at.is_some() {
+            return Err(IpcError {
+                code: "vault_operation_not_cancellable",
+            });
+        }
+    }
+    transfer.reporter.cancel.store(true, Ordering::Release);
+    transfer.reporter.update("cancelling", 0, 0, false);
+    Ok(CancelTransferResponse {
+        state: "cancelling",
+    })
+}
+
+fn choose_file(state: &VaultAppState, kind: TransferKind) -> Result<SelectionResponse, IpcError> {
+    let epoch = {
+        let mut inner = state.lock()?;
+        prepare_new_transfer(&mut inner, &state.path)?;
+        match (kind, &inner.session) {
+            (TransferKind::Export, SessionState::Unlocked { .. })
+            | (TransferKind::Import, SessionState::Uninitialized) => {}
+            (TransferKind::Export, SessionState::Locked(_)) => {
+                return Err(VaultError::Locked.into());
+            }
+            (TransferKind::Export, SessionState::Uninitialized) => {
+                return Err(VaultError::Uninitialized.into());
+            }
+            (TransferKind::Import, _) => return Err(VaultError::AlreadyInitialized.into()),
+        }
+        inner.selection = None;
+        inner.session_epoch
+    };
+
+    #[cfg(target_os = "macos")]
+    let outcome = match kind {
+        TransferKind::Export => file_panel::choose_export(),
+        TransferKind::Import => file_panel::choose_import(),
+    }
+    .map_err(|_| IpcError {
+        code: "vault_path_rejected",
+    })?;
+    #[cfg(not(target_os = "macos"))]
+    let outcome: Result<(), IpcError> = Err(IpcError {
+        code: "vault_platform_unsupported",
+    });
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = outcome?;
+        unreachable!()
+    }
+    #[cfg(target_os = "macos")]
+    match outcome {
+        PanelOutcome::Cancelled => Ok(SelectionResponse::Cancelled),
+        PanelOutcome::Selected(path) => {
+            let id = random_identifier()?;
+            let mut inner = state.lock()?;
+            if inner.session_epoch != epoch || inner.transfer.is_some() {
+                return Err(IpcError {
+                    code: "vault_selection_not_found",
+                });
+            }
+            inner.selection = Some(FileSelection {
+                id,
+                kind,
+                path,
+                session_epoch: epoch,
+                expires_at: Instant::now() + TRANSFER_TTL,
+            });
+            Ok(SelectionResponse::Selected {
+                selection_id: encode_hex(id),
+            })
+        }
+    }
+}
+
+fn consume_selection(
+    inner: &mut AppStateInner,
+    selection_id: [u8; 16],
+    kind: TransferKind,
+) -> Result<FileSelection, IpcError> {
+    clear_expired_selection(inner);
+    let matches = inner
+        .selection
+        .as_ref()
+        .is_some_and(|selection| selection.id == selection_id);
+    if !matches {
+        return Err(IpcError {
+            code: "vault_selection_not_found",
+        });
+    }
+    let selection = inner.selection.take().ok_or(IpcError {
+        code: "vault_selection_not_found",
+    })?;
+    if selection.kind != kind || selection.expires_at <= Instant::now() {
+        return Err(IpcError {
+            code: "vault_selection_not_found",
+        });
+    }
+    Ok(selection)
+}
+
+fn prepare_new_transfer(inner: &mut AppStateInner, path: &Path) -> Result<(), IpcError> {
+    reconcile_transfer(inner, path)?;
+    let terminal = inner.transfer.as_ref().is_some_and(|transfer| {
+        transfer
+            .reporter
+            .progress
+            .lock()
+            .is_ok_and(|progress| progress.terminal_at.is_some())
+    });
+    if terminal
+        && let Some(mut transfer) = inner.transfer.take()
+        && let Some(handle) = transfer.handle.take()
+    {
+        let _ = handle.join();
+    }
+    if inner.transfer.is_some() {
+        return Err(IpcError {
+            code: "vault_operation_in_progress",
+        });
+    }
+    Ok(())
+}
+
+fn reconcile_transfer(inner: &mut AppStateInner, path: &Path) -> Result<(), IpcError> {
+    let completed_import = inner.transfer.as_ref().is_some_and(|transfer| {
+        transfer.kind == TransferKind::Import
+            && transfer
+                .reporter
+                .progress
+                .lock()
+                .is_ok_and(|progress| progress.state == "completed")
+    });
+    if completed_import && matches!(inner.session, SessionState::Uninitialized) {
+        inner.session = SessionState::Locked(VaultRepository::open(path)?);
+        inner.session_epoch = inner.session_epoch.wrapping_add(1);
+        inner.selection = None;
+    }
+    let expired = inner.transfer.as_ref().is_some_and(|transfer| {
+        transfer.reporter.progress.lock().is_ok_and(|progress| {
+            progress
+                .terminal_at
+                .is_some_and(|finished| finished + TRANSFER_TTL <= Instant::now())
+        })
+    });
+    if expired {
+        if let Some(mut transfer) = inner.transfer.take()
+            && let Some(handle) = transfer.handle.take()
+        {
+            let _ = handle.join();
+        }
+        return Ok(());
+    }
+    let Some(transfer) = inner.transfer.as_mut() else {
+        return Ok(());
+    };
+    if transfer
+        .handle
+        .as_ref()
+        .is_some_and(JoinHandle::is_finished)
+        && let Some(handle) = transfer.handle.take()
+    {
+        let _ = handle.join();
+    }
+    Ok(())
+}
+
+fn clear_expired_selection(inner: &mut AppStateInner) {
+    if inner
+        .selection
+        .as_ref()
+        .is_some_and(|selection| selection.expires_at <= Instant::now())
+    {
+        inner.selection = None;
+    }
+}
+
+fn random_identifier() -> Result<[u8; 16], IpcError> {
+    let mut value = [0_u8; 16];
+    fill_random(&mut value).map_err(VaultError::from)?;
+    Ok(value)
+}
+
+const fn transfer_kind_name(kind: TransferKind) -> &'static str {
+    match kind {
+        TransferKind::Export => "export",
+        TransferKind::Import => "import",
+    }
 }
 
 fn parse_json<T: DeserializeOwned>(body: &InvokeBody) -> Result<T, IpcError> {
@@ -1049,6 +1633,97 @@ mod tests {
             )
             .is_err()
         );
+        assert!(
+            serde_json::from_str::<SelectionIdRequest>(
+                r#"{"selectionId":"11111111111111111111111111111111"}"#
+            )
+            .is_ok()
+        );
+        assert!(
+            serde_json::from_str::<SelectionIdRequest>(
+                r#"{"selectionId":"11111111111111111111111111111111","path":"/tmp/secret"}"#
+            )
+            .is_err()
+        );
+        assert!(
+            serde_json::from_str::<ImportStartRequest>(
+                r#"{"selectionId":"11111111111111111111111111111111","password":"synthetic"}"#
+            )
+            .is_ok()
+        );
+        assert!(
+            serde_json::from_str::<ImportStartRequest>(
+                r#"{"selectionId":"11111111111111111111111111111111","password":"synthetic","bytes":[1]}"#
+            )
+            .is_err()
+        );
+        assert!(
+            serde_json::from_str::<OperationIdRequest>(
+                r#"{"operationId":"11111111111111111111111111111111","extra":true}"#
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn transfer_tokens_are_typed_expiring_one_shot_and_progress_is_monotonic() {
+        let selection_id = [0x11; 16];
+        let mut inner = AppStateInner {
+            session: SessionState::Uninitialized,
+            pending_upload: None,
+            selection: Some(FileSelection {
+                id: selection_id,
+                kind: TransferKind::Import,
+                path: PathBuf::from("/not/exposed.aeterna-vault"),
+                session_epoch: 7,
+                expires_at: Instant::now() + Duration::from_secs(60),
+            }),
+            transfer: None,
+            session_epoch: 7,
+        };
+        assert_error(
+            consume_selection(&mut inner, [0x22; 16], TransferKind::Import),
+            "vault_selection_not_found",
+        );
+        let consumed = consume_selection(&mut inner, selection_id, TransferKind::Import)
+            .unwrap_or_else(|error| panic!("selection consume failed: {error:?}"));
+        assert_eq!(consumed.session_epoch, 7);
+        assert_error(
+            consume_selection(&mut inner, selection_id, TransferKind::Import),
+            "vault_selection_not_found",
+        );
+
+        inner.selection = Some(FileSelection {
+            id: selection_id,
+            kind: TransferKind::Export,
+            path: PathBuf::from("/not/exposed.aeterna-vault"),
+            session_epoch: 7,
+            expires_at: Instant::now(),
+        });
+        assert_error(
+            consume_selection(&mut inner, selection_id, TransferKind::Export),
+            "vault_selection_not_found",
+        );
+
+        let reporter = TransferReporter::new();
+        reporter.update("writing", 100, 5, true);
+        reporter.update("writing", 10, 2, true);
+        let progress = reporter
+            .progress
+            .lock()
+            .unwrap_or_else(|_| panic!("progress lock failed"));
+        assert_eq!(progress.bytes, 100);
+        assert_eq!(progress.entries, 5);
+        drop(progress);
+        reporter.finish(Err(TransferError::Cancelled));
+        reporter.update("writing", 500, 50, true);
+        let progress = reporter
+            .progress
+            .lock()
+            .unwrap_or_else(|_| panic!("progress lock failed"));
+        assert_eq!(progress.state, "cancelled");
+        assert_eq!(progress.bytes, 100);
+        assert!(!progress.cancellable);
     }
 
     #[test]
@@ -1058,6 +1733,9 @@ mod tests {
             inner: Mutex::new(AppStateInner {
                 session: SessionState::Uninitialized,
                 pending_upload: None,
+                selection: None,
+                transfer: None,
+                session_epoch: 0,
             }),
         };
         assert_eq!(format!("{state:?}"), "VaultAppState([REDACTED])");
@@ -1066,6 +1744,20 @@ mod tests {
             serialized.as_deref(),
             Ok(r#"{"code":"vault_locked"}"#)
         ));
+        let selected = serde_json::to_value(SelectionResponse::Selected {
+            selection_id: "11111111111111111111111111111111".to_owned(),
+        })
+        .unwrap_or(serde_json::Value::Null);
+        assert_eq!(
+            selected,
+            json!({
+                "outcome": "selected",
+                "selectionId": "11111111111111111111111111111111",
+            })
+        );
+        let cancelled =
+            serde_json::to_value(SelectionResponse::Cancelled).unwrap_or(serde_json::Value::Null);
+        assert_eq!(cancelled, json!({ "outcome": "cancelled" }));
     }
 
     #[test]
@@ -1076,6 +1768,31 @@ mod tests {
         assert_eq!(
             json_result(vault_status_impl(&json_body(json!({})), &state)),
             Ok(json!({ "state": "uninitialized" }))
+        );
+        assert_error(
+            vault_export_start_impl(
+                &json_body(json!({
+                    "selectionId": "11111111111111111111111111111111",
+                    "path": "/tmp/secret",
+                })),
+                &state,
+            ),
+            "ipc_invalid_request",
+        );
+        assert_error(
+            vault_import_start_impl(
+                &json_body(json!({
+                    "selectionId": "11111111111111111111111111111111",
+                    "password": "synthetic-password",
+                    "packageBytes": [1, 2, 3],
+                })),
+                &state,
+            ),
+            "ipc_invalid_request",
+        );
+        assert_error(
+            vault_transfer_status_impl(&InvokeBody::Raw(vec![1, 2, 3]), &state),
+            "ipc_invalid_request",
         );
         assert_eq!(
             json_result(vault_status_impl(
@@ -1283,10 +2000,47 @@ mod tests {
         );
         assert_eq!(raw_read, Ok(vec![1, 2, 3]));
 
+        let transfer_reporter = TransferReporter::new();
+        let worker_reporter = transfer_reporter.clone();
+        let transfer_worker = thread::spawn(move || {
+            while !worker_reporter.cancel.load(Ordering::Acquire) {
+                thread::yield_now();
+            }
+            worker_reporter.finish(Err(TransferError::Cancelled));
+        });
+        {
+            let mut inner = state
+                .lock()
+                .unwrap_or_else(|error| panic!("test state lock failed: {error:?}"));
+            inner.transfer = Some(TransferOperation {
+                id: [0x44; 16],
+                kind: TransferKind::Export,
+                reporter: transfer_reporter,
+                handle: Some(transfer_worker),
+            });
+        }
         assert_eq!(
             json_result(vault_lock_impl(&json_body(json!({})), &state)),
             Ok(json!({ "state": "locked" }))
         );
+        {
+            let inner = state
+                .lock()
+                .unwrap_or_else(|error| panic!("test state lock failed: {error:?}"));
+            assert!(matches!(inner.session, SessionState::Locked(_)));
+            let transfer = inner
+                .transfer
+                .as_ref()
+                .unwrap_or_else(|| panic!("cancelled export status is retained"));
+            assert!(transfer.handle.is_none());
+            let progress = transfer
+                .reporter
+                .progress
+                .lock()
+                .unwrap_or_else(|_| panic!("progress lock failed"));
+            assert_eq!(progress.state, "cancelled");
+            assert!(!progress.cancellable);
+        }
         assert_error(
             vault_list_items_impl(&json_body(json!({})), &state),
             "vault_locked",

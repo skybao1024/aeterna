@@ -71,7 +71,7 @@ function resolved(value: unknown): Promise<unknown> {
   return Promise.resolve(value);
 }
 
-describe("I06 local vault workflow", () => {
+describe("I07 local vault workflow", () => {
   beforeEach(() => {
     window.localStorage.clear();
     invokeMock.mockReset();
@@ -95,7 +95,7 @@ describe("I06 local vault workflow", () => {
     ).toBeInTheDocument();
     expect(
       screen.getByText(
-        /recovery, account binding, backup, and export are not available/i,
+        /encrypted local export is available, but emergency recovery/i,
       ),
     ).toBeInTheDocument();
 
@@ -330,12 +330,213 @@ describe("I06 local vault workflow", () => {
     expect(Object.keys(window.localStorage)).toEqual([]);
   });
 
+  it("confirms and reports an encrypted export without exposing a path", async () => {
+    const user = userEvent.setup();
+    const selectionId = "44444444444444444444444444444444";
+    const operationId = "55555555555555555555555555555555";
+    invokeMock.mockImplementation((command) => {
+      if (command === "vault_status") return resolved({ state: "unlocked" });
+      if (command === "vault_list_items") return resolved({ items: [] });
+      if (command === "vault_export_choose") {
+        return resolved({ outcome: "selected", selectionId });
+      }
+      if (command === "vault_export_start") return resolved({ operationId });
+      if (command === "vault_transfer_status") {
+        return resolved({
+          kind: "export",
+          state: "completed",
+          phase: "completed",
+          bytesProcessed: "1161",
+          entriesProcessed: "7",
+          cancellable: false,
+        });
+      }
+      throw new Error("unexpected command");
+    });
+    renderApplication();
+
+    await user.click(
+      await screen.findByRole("button", { name: "Export encrypted vault" }),
+    );
+    expect(screen.getByRole("alertdialog")).toHaveAccessibleName(
+      "Export an encrypted vault copy?",
+    );
+    await user.click(
+      within(screen.getByRole("alertdialog")).getByRole("button", {
+        name: "Export encrypted vault",
+      }),
+    );
+    expect(
+      await screen.findByText("The transfer completed."),
+    ).toBeInTheDocument();
+    expect(invokeMock).toHaveBeenCalledWith("vault_export_start", {
+      selectionId,
+    });
+    expect(JSON.stringify(invokeMock.mock.calls)).not.toContain(
+      ".aeterna-vault",
+    );
+    expect(Object.keys(window.localStorage)).toEqual([]);
+  });
+
+  it("restores only after the rollback warning and returns to the locked screen", async () => {
+    const user = userEvent.setup();
+    const selectionId = "66666666666666666666666666666666";
+    const operationId = "77777777777777777777777777777777";
+    invokeMock.mockImplementation((command) => {
+      if (command === "vault_status") {
+        return resolved({ state: "uninitialized" });
+      }
+      if (command === "vault_import_choose") {
+        return resolved({ outcome: "selected", selectionId });
+      }
+      if (command === "vault_import_start") return resolved({ operationId });
+      if (command === "vault_transfer_status") {
+        return resolved({
+          kind: "import",
+          state: "completed",
+          phase: "completed",
+          bytesProcessed: "1161",
+          entriesProcessed: "7",
+          cancellable: false,
+        });
+      }
+      throw new Error("unexpected command");
+    });
+    renderApplication();
+
+    await user.type(
+      await screen.findByLabelText("Master password"),
+      "synthetic-password",
+    );
+    await user.click(
+      screen.getByRole("button", { name: "Import encrypted vault" }),
+    );
+    expect(screen.getByRole("alertdialog")).toHaveAccessibleName(
+      "Restore this encrypted vault package?",
+    );
+    expect(
+      screen.getByText(/authentic older package may omit later changes/i),
+    ).toBeInTheDocument();
+    await user.click(
+      within(screen.getByRole("alertdialog")).getByRole("button", {
+        name: "Import encrypted vault",
+      }),
+    );
+
+    expect(
+      await screen.findByText("The transfer completed."),
+    ).toBeInTheDocument();
+    expect(invokeMock).toHaveBeenCalledWith("vault_import_start", {
+      selectionId,
+      password: "synthetic-password",
+    });
+    await user.click(screen.getByRole("button", { name: "Close" }));
+    expect(
+      await screen.findByRole("heading", { name: "Unlock your local vault" }),
+    ).toBeInTheDocument();
+    expect(JSON.stringify(invokeMock.mock.calls)).not.toContain(
+      ".aeterna-vault",
+    );
+  });
+
+  it("cancels an active export from the keyboard-accessible progress dialog", async () => {
+    const user = userEvent.setup();
+    const selectionId = "88888888888888888888888888888888";
+    const operationId = "99999999999999999999999999999999";
+    invokeMock.mockImplementation((command) => {
+      if (command === "vault_status") return resolved({ state: "unlocked" });
+      if (command === "vault_list_items") return resolved({ items: [] });
+      if (command === "vault_export_choose") {
+        return resolved({ outcome: "selected", selectionId });
+      }
+      if (command === "vault_export_start") return resolved({ operationId });
+      if (command === "vault_transfer_cancel") {
+        return resolved({ state: "cancelling" });
+      }
+      if (command === "vault_transfer_status") {
+        return resolved({
+          kind: "export",
+          state: "cancelled",
+          phase: "cancelled",
+          bytesProcessed: "96",
+          entriesProcessed: "0",
+          cancellable: false,
+          errorCode: "vault_operation_cancelled",
+        });
+      }
+      throw new Error("unexpected command");
+    });
+    renderApplication();
+
+    await user.click(
+      await screen.findByRole("button", { name: "Export encrypted vault" }),
+    );
+    await user.click(
+      within(screen.getByRole("alertdialog")).getByRole("button", {
+        name: "Export encrypted vault",
+      }),
+    );
+    const cancel = await screen.findByRole("button", {
+      name: "Cancel transfer",
+    });
+    expect(cancel).toHaveFocus();
+    await user.keyboard("{Escape}");
+    expect(invokeMock).toHaveBeenCalledWith("vault_transfer_cancel", {
+      operationId,
+    });
+    expect(
+      await screen.findByText("The transfer was cancelled."),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Transfer cancelled");
+  });
+
+  it("surfaces overwrite refusal as a localized safe failure", async () => {
+    const user = userEvent.setup();
+    const selectionId = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    const operationId = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+    invokeMock.mockImplementation((command) => {
+      if (command === "vault_status") return resolved({ state: "unlocked" });
+      if (command === "vault_list_items") return resolved({ items: [] });
+      if (command === "vault_export_choose") {
+        return resolved({ outcome: "selected", selectionId });
+      }
+      if (command === "vault_export_start") return resolved({ operationId });
+      if (command === "vault_transfer_status") {
+        return resolved({
+          kind: "export",
+          state: "failed",
+          phase: "failed",
+          bytesProcessed: "0",
+          entriesProcessed: "0",
+          cancellable: false,
+          errorCode: "vault_export_target_exists",
+        });
+      }
+      throw new Error("unexpected command");
+    });
+    renderApplication();
+    await user.click(
+      await screen.findByRole("button", { name: "Export encrypted vault" }),
+    );
+    await user.click(
+      within(screen.getByRole("alertdialog")).getByRole("button", {
+        name: "Export encrypted vault",
+      }),
+    );
+    expect(
+      await screen.findByText(
+        "That export filename already exists. Choose a new filename.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByText("The transfer failed safely.")).toBeInTheDocument();
+  });
+
   it("restores supported locale preferences only", () => {
     expect(resolveSavedLocale(null)).toBe(DEFAULT_LOCALE);
     expect(resolveSavedLocale("fr-FR")).toBe(DEFAULT_LOCALE);
     window.localStorage.setItem(LOCALE_STORAGE_KEY, "zh-CN");
     invokeMock.mockResolvedValue({ state: "locked" });
     renderApplication();
-    expect(screen.getByText("I06 本地开发预览")).toBeInTheDocument();
+    expect(screen.getByText("I07 本地开发预览")).toBeInTheDocument();
   });
 });

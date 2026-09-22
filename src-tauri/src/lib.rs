@@ -1,5 +1,7 @@
 pub mod activity;
 pub mod crypto;
+#[cfg(target_os = "macos")]
+mod file_panel;
 mod ipc;
 pub mod secure_storage;
 pub mod vault;
@@ -33,6 +35,12 @@ pub fn run() -> Result<(), tauri::Error> {
             ipc::vault_cancel_attachment,
             ipc::vault_read_attachment,
             ipc::vault_remove_attachment,
+            ipc::vault_export_choose,
+            ipc::vault_export_start,
+            ipc::vault_import_choose,
+            ipc::vault_import_start,
+            ipc::vault_transfer_status,
+            ipc::vault_transfer_cancel,
         ]);
 
     #[cfg(feature = "activity-prototype")]

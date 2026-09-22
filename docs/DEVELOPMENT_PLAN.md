@@ -67,7 +67,7 @@ Status values are `Pending`, `In Progress`, `Blocked`, and `Accepted`.
 | G0  | macOS Phase 0 architecture and security gate         | Both       | I01-I03; approved I04 implementation checkpoint     | macOS-scope ADRs approved; deferred decisions assigned to explicit later gates        | Accepted |
 | I05 | Versioned vault format and encrypted storage core    | Client     | G0                                                  | Local encrypted records survive restart and tampering is rejected                    | Accepted |
 | I06 | Vault item and bounded-attachment MVP                | Client     | I05                                                 | User can create, edit, read, and delete encrypted local content                      | Accepted |
-| I07 | Atomic encrypted export and import                   | Client     | I05-I06                                             | Interruption and tampering tests pass; restored vault matches source                 | Pending |
+| I07 | Atomic encrypted export and import                   | Client     | I05-I06                                             | Interruption and tampering tests pass; restored vault matches source                 | Accepted |
 | I08 | macOS lifecycle, activity agent, and hardening       | Client     | G0, I01, I05-I07                                    | macOS autostart, tray health, CSP, capabilities, and i18n acceptance pass            | Pending |
 | GW  | Windows platform qualification gate                 | Client     | I04; application core available for Windows testing | Real-Windows matrices pass; ADR 0003 approved or redesigned; no unqualified release  | Pending |
 | I09 | Public protocol v1 and account/device binding        | Both       | G0                                                  | Versioned schemas and fixtures drive client and server contract tests                | Pending |
@@ -226,6 +226,20 @@ verify the complete manifest and ciphertext, then commit. Test interruption,
 truncation, duplication, tampering, unsupported versions, and restoration from
 two independent copies.
 
+The executable brief is
+[`iterations/I07-atomic-encrypted-export-import.md`](./iterations/I07-atomic-encrypted-export-import.md).
+The pre-implementation format and dependency proposal is
+[`research/I07-export-import-format-and-dependency-proposal.md`](./research/I07-export-import-format-and-dependency-proposal.md).
+Current implementation and verification evidence is recorded in
+[`research/I07-export-import-results.md`](./research/I07-export-import-results.md).
+The proposal and ADR 0009, including the corrected canonical I05 migration
+identifier, received explicit user approval on 2026-09-22. I07 is Accepted
+after byte-exact format, restore equivalence, native macOS, deterministic
+filesystem-fault, subprocess-crash, authenticated 24-hour cleanup, and exact
+1-GiB package-boundary evidence passed. Coverage-guided fuzzing, sanitizers,
+independent cryptographic review, and penetration testing remain later security
+gates rather than I07 acceptance substitutes.
+
 ### I08 — macOS lifecycle, activity agent, and hardening
 
 Turn the accepted macOS prototypes into production components. Add autostart,
@@ -366,3 +380,4 @@ evidence.
 - 2026-09-21: G0 accepted by explicit user approval in task `01a0c30a-8bf6-76a1-b994-9398e5adf229`. Client root checkpoint `54a213c5e17f5e1e3eae183f17f1f2370aa7a61d` preserves the reviewed Phase 0 baseline. Server checkpoint `9873e418909d52885ee4b4c61ae3a6d16f5beff6` is on `codex/i03-concurrency-checkpoint` and was fast-forwarded into clean authoritative `dev`; post-integration Alembic current/check, 12 focused and 35 total PostgreSQL tests, focused Black/isort, and critical Flake8 passed. ADRs 0001, 0002, and 0004-0006 are Accepted; the server ADR is Accepted. Apple Silicon macOS 15.0 is the initial product/test target subject to I08 native qualification. I05 is next eligible. I04 and GW remain incomplete.
 - 2026-09-21: I05 accepted in task `01a0c37c-83e4-7b70-a0e2-7d5a760b77e7`. The exact SQLite dependency and v1 format proposal were approved before implementation. The Rust-owned repository passed 65 Rust unit tests, 9 real-file I05 integration tests, interruption, concurrency, tamper, nonce, recovery, and main/WAL/SHM/journal/staging/backup privacy evidence; pinned-toolchain `npm run check` and the unsigned desktop build passed. ADR 0007 is Accepted. Cross-copy nonce uniqueness remains probabilistic at the 96-bit CSPRNG boundary, and the known non-fatal `rust-objcopy` warning remains. I06 is next eligible but was not started.
 - 2026-09-22: I06 accepted in task `01a0c444-7650-7c91-a70b-a5a4b6edb485`. The exact item payload, 786,432-byte aggregate attachment cap, recovery-less development onboarding, fixed app-local path, Rust session state, fourteen-command JSON/raw IPC boundary, and capability allowlist were approved before implementation in ADR 0008. Focused checks passed 7 item, 4 IPC, 5 real-file I06, and 14 frontend tests; pinned-toolchain `npm run check` passed 72 Rust unit, 9 I05 integration, and 5 I06 integration tests plus all format/lint/type/build checks. The unsigned desktop build passed with the known non-fatal `rust-objcopy` warning, and the native macOS setup screen was inspected in both locales without creating persistent unrecoverable test data. I07 is next eligible but was not started.
+- 2026-09-22: I07 accepted after explicit approval of ADR 0009 and the corrected 15-byte `create_vault_v1` identifier. The exact package, two-copy restore, nonce, privacy, fixed-seed mutation, native AppKit, deterministic short-write/`ENOSPC`/quota/syscall failure, 41-state subprocess crash, authenticated 24-hour cleanup, permission/special-file, destination-parent swap, and exact 1,073,741,824-byte package evidence passed. The heavy maximum fixture authenticated and decrypted 1,156 valid records in 568.33 seconds and rejected limit plus one. Final pinned-toolchain `npm run check` passed 20 frontend tests, 85 non-ignored Rust unit tests, 9 I05 integration tests, and 5 I06 integration tests; the sole ignored unit is that separately executed 1-GiB fixture. The unsigned desktop build passed with the known non-fatal `rust-objcopy` warning. I08 is next eligible but was not started.

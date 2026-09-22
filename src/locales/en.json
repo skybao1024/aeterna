@@ -2,7 +2,7 @@
   "app": {
     "brand": "Aeterna",
     "windowTitle": "Aeterna local vault preview",
-    "previewLabel": "I06 local development preview"
+    "previewLabel": "I07 local development preview"
   },
   "locale": {
     "label": "Language",
@@ -17,7 +17,7 @@
   "setup": {
     "title": "Create a local vault",
     "description": "Choose a master password to protect encrypted notes, instructions, and bounded attachments on this device.",
-    "warning": "Development preview: recovery, account binding, backup, and export are not available. If you lose the master password, this vault cannot be recovered. Do not store irreplaceable data."
+    "warning": "Development preview: encrypted local export is available, but emergency recovery and account/device binding are not. If you lose the master password, neither the vault nor an export can be recovered. Do not store irreplaceable data."
   },
   "unlock": {
     "title": "Unlock your local vault",
@@ -35,7 +35,10 @@
     "inspect": "Inspect",
     "replace": "Replace",
     "remove": "Remove",
-    "close": "Close"
+    "close": "Close",
+    "exportVault": "Export encrypted vault",
+    "importVault": "Import encrypted vault",
+    "cancelTransfer": "Cancel transfer"
   },
   "fields": {
     "password": "Master password",
@@ -85,6 +88,40 @@
     "deleteDescription": "This permanently deletes the item and all of its attachments from the local vault. Storage hardware or backups may retain forensic remnants.",
     "delete": "Delete item"
   },
+  "transfer": {
+    "exportConfirmTitle": "Export an encrypted vault copy?",
+    "exportConfirmDescription": "The package keeps item content encrypted but exposes structural metadata, counts, sizes, timestamps, and identifiers. Store it on protected media. Existing files are never overwritten, and this export does not add emergency recovery.",
+    "importConfirmTitle": "Restore this encrypted vault package?",
+    "importConfirmDescription": "Import is allowed only into an empty local target. An authentic older package may omit later changes. The source lineage and unavailable development recovery wrapper are preserved; no new device is registered.",
+    "importWarning": "To restore instead of creating a new vault, enter the package's master password and choose an encrypted package. Import never overwrites an existing vault and may restore an older state.",
+    "exportTitle": "Export encrypted vault",
+    "importTitle": "Import encrypted vault",
+    "lastExport": "Last successful export in this app session: {{date}}. This is not freshness evidence.",
+    "progress": "Processed {{bytes}} and {{entries}} entries.",
+    "phases": {
+      "choosing": "Waiting for file selection…",
+      "preparing": "Preparing the secure transfer…",
+      "snapshotting": "Opening one committed vault snapshot…",
+      "writing": "Writing authenticated encrypted records…",
+      "copying": "Copying the selected package into private quarantine…",
+      "validating": "Validating package structure and compatibility…",
+      "authenticating": "Authenticating the package and encrypted records…",
+      "reconstructing": "Reconstructing a fresh local vault…",
+      "verifying": "Verifying the reconstructed vault…",
+      "publishing": "Publishing the completed file atomically…",
+      "cancelling": "Cancelling safely…",
+      "completed": "The transfer completed.",
+      "cancelled": "The transfer was cancelled.",
+      "failed": "The transfer failed safely."
+    },
+    "states": {
+      "running": "Transfer in progress",
+      "cancelling": "Cancellation in progress",
+      "completed": "Transfer completed",
+      "cancelled": "Transfer cancelled",
+      "failed": "Transfer failed"
+    }
+  },
   "errors": {
     "crypto_authentication_failed": "The password is incorrect, or the authenticated vault data was changed.",
     "crypto_randomness_unavailable": "Secure randomness is temporarily unavailable.",
@@ -102,10 +139,23 @@
     "vault_invalid_format": "The local vault format is invalid.",
     "vault_invalid_input": "One or more values are invalid or too long.",
     "vault_io_error": "The local vault could not be accessed safely.",
+    "vault_export_limit_exceeded": "The vault is too large to export within the approved package limits.",
+    "vault_export_target_exists": "That export filename already exists. Choose a new filename.",
+    "vault_import_invalid_package": "The selected file is not a complete, authentic Aeterna package.",
+    "vault_import_limit_exceeded": "The selected package exceeds the approved import limits.",
+    "vault_import_target_exists": "A local vault or related database file already exists. Import never overwrites it.",
+    "vault_import_unsupported_version": "The selected package uses an unsupported format or encrypted-data version.",
     "vault_item_invalid_format": "An encrypted item has an invalid format.",
     "vault_item_unsupported_version": "An encrypted item uses an unsupported version.",
     "vault_locked": "Unlock the local vault before accessing content.",
     "vault_not_found": "The requested item no longer exists.",
+    "vault_operation_cancelled": "The transfer was cancelled safely.",
+    "vault_operation_in_progress": "Finish or cancel the current vault transfer first.",
+    "vault_operation_not_cancellable": "The transfer has reached an atomic step and can no longer be cancelled.",
+    "vault_operation_not_found": "The vault transfer expired or no longer exists.",
+    "vault_path_rejected": "The selected file location could not be used safely.",
+    "vault_platform_unsupported": "Encrypted export and import are available only on macOS in this iteration.",
+    "vault_selection_not_found": "The file selection expired, was already used, or belongs to another operation.",
     "vault_uninitialized": "Create the local vault before accessing content.",
     "vault_unsupported_version": "The local vault uses an unsupported version.",
     "vault_upload_not_found": "The attachment transfer expired, was cancelled, or was already used.",

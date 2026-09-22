@@ -196,9 +196,9 @@ impl fmt::Debug for DecryptedRecord {
 }
 
 pub struct UnlockedVault {
-    repository: VaultRepository,
-    vdk: Vdk,
-    vault_id: [u8; 16],
+    pub(super) repository: VaultRepository,
+    pub(super) vdk: Vdk,
+    pub(super) vault_id: [u8; 16],
 }
 
 impl fmt::Debug for UnlockedVault {
@@ -207,10 +207,10 @@ impl fmt::Debug for UnlockedVault {
     }
 }
 
-struct VaultMetadata {
-    header: HeaderRow,
-    master: MasterRow,
-    recovery: RecoveryRow,
+pub(super) struct VaultMetadata {
+    pub header: HeaderRow,
+    pub master: MasterRow,
+    pub recovery: RecoveryRow,
 }
 
 impl VaultRepository {
@@ -418,7 +418,7 @@ impl VaultRepository {
         Ok(())
     }
 
-    fn connection(&self) -> VaultResult<Connection> {
+    pub(super) fn connection(&self) -> VaultResult<Connection> {
         preflight_vault_files(&self.path)?;
         let connection = open_connection(&self.path, false)?;
         migration::verify_schema(&connection)?;
@@ -771,7 +771,7 @@ fn initialize_staging_database(
     Ok(RecoveryMaterial { erc, recovery_salt })
 }
 
-fn insert_header(connection: &Connection, header: &HeaderRow) -> VaultResult<()> {
+pub(super) fn insert_header(connection: &Connection, header: &HeaderRow) -> VaultResult<()> {
     connection.execute(
         "INSERT INTO vault_header (singleton, magic, container_version, schema_version, crypto_version, vault_id, device_id, header_auth_nonce, header_auth_tag, created_at_ms, updated_at_ms) VALUES (1, ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?9)",
         params![
@@ -789,7 +789,7 @@ fn insert_header(connection: &Connection, header: &HeaderRow) -> VaultResult<()>
     Ok(())
 }
 
-fn insert_master(connection: &Connection, master: &MasterRow) -> VaultResult<()> {
+pub(super) fn insert_master(connection: &Connection, master: &MasterRow) -> VaultResult<()> {
     connection.execute(
         "INSERT INTO master_wrapper (singleton, revision, format_version, aead_algorithm, purpose, kdf_algorithm, kdf_version, memory_kib, time_cost, parallelism, output_length, salt, nonce, ciphertext_and_tag, created_at_ms, updated_at_ms) VALUES (1, ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?14)",
         params![
@@ -812,7 +812,7 @@ fn insert_master(connection: &Connection, master: &MasterRow) -> VaultResult<()>
     Ok(())
 }
 
-fn insert_recovery(connection: &Connection, recovery: &RecoveryRow) -> VaultResult<()> {
+pub(super) fn insert_recovery(connection: &Connection, recovery: &RecoveryRow) -> VaultResult<()> {
     connection.execute(
         "INSERT INTO recovery_wrapper (singleton, recovery_id, device_id, format_version, aead_algorithm, purpose, nonce, ciphertext_and_tag, created_at_ms) VALUES (1, ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
         params![
@@ -829,7 +829,7 @@ fn insert_recovery(connection: &Connection, recovery: &RecoveryRow) -> VaultResu
     Ok(())
 }
 
-fn load_metadata(connection: &Connection) -> VaultResult<VaultMetadata> {
+pub(super) fn load_metadata(connection: &Connection) -> VaultResult<VaultMetadata> {
     let header = connection.query_row(
         "SELECT magic, container_version, schema_version, crypto_version, vault_id, device_id, header_auth_nonce, header_auth_tag, created_at_ms, updated_at_ms FROM vault_header WHERE singleton = 1",
         [],
@@ -948,7 +948,7 @@ fn verify_reserved_nonce(
     Ok(())
 }
 
-fn validate_header_versions(header: &HeaderRow) -> VaultResult<()> {
+pub(super) fn validate_header_versions(header: &HeaderRow) -> VaultResult<()> {
     if header.magic != format::VAULT_MAGIC {
         return Err(VaultError::InvalidFormat);
     }
@@ -961,7 +961,7 @@ fn validate_header_versions(header: &HeaderRow) -> VaultResult<()> {
     Ok(())
 }
 
-fn verify_header_authentication(metadata: &VaultMetadata, vdk: &Vdk) -> VaultResult<()> {
+pub(super) fn verify_header_authentication(metadata: &VaultMetadata, vdk: &Vdk) -> VaultResult<()> {
     let digest = wrapper_digest(
         metadata.header.vault_id,
         &metadata.master,
@@ -987,7 +987,7 @@ fn wrapper_context(header: &HeaderRow) -> WrapContext {
     }
 }
 
-fn open_connection(path: &Path, create: bool) -> VaultResult<Connection> {
+pub(super) fn open_connection(path: &Path, create: bool) -> VaultResult<Connection> {
     let mut flags = OpenFlags::SQLITE_OPEN_READ_WRITE
         | OpenFlags::SQLITE_OPEN_NO_MUTEX
         | OpenFlags::SQLITE_OPEN_PRIVATE_CACHE
@@ -1124,7 +1124,7 @@ fn ensure_target_absent(path: &Path) -> VaultResult<()> {
     Ok(())
 }
 
-fn preflight_vault_files(path: &Path) -> VaultResult<()> {
+pub(super) fn preflight_vault_files(path: &Path) -> VaultResult<()> {
     let metadata = fs::symlink_metadata(path)?;
     if metadata.file_type().is_symlink()
         || !metadata.is_file()
@@ -1182,7 +1182,7 @@ fn create_staging_file(parent: &Path, random: &dyn RandomSource) -> VaultResult<
     Err(VaultError::RandomnessUnavailable)
 }
 
-fn cleanup_owned_staging_files(path: &Path) {
+pub(super) fn cleanup_owned_staging_files(path: &Path) {
     for candidate in [
         path.to_path_buf(),
         suffixed_path(path, "-wal"),
@@ -1199,7 +1199,7 @@ fn suffixed_path(path: &Path, suffix: &str) -> PathBuf {
     PathBuf::from(value)
 }
 
-fn sync_directory(path: &Path) -> VaultResult<()> {
+pub(super) fn sync_directory(path: &Path) -> VaultResult<()> {
     File::open(path)?.sync_all()?;
     Ok(())
 }
@@ -1236,7 +1236,7 @@ fn validate_plaintext_length(plaintext: &[u8]) -> VaultResult<()> {
     Ok(())
 }
 
-fn positive_u8(value: i64) -> VaultResult<u8> {
+pub(super) fn positive_u8(value: i64) -> VaultResult<u8> {
     let value = u8::try_from(value).map_err(|_| VaultError::InvalidFormat)?;
     if value == 0 {
         return Err(VaultError::UnsupportedVersion);
@@ -1244,7 +1244,7 @@ fn positive_u8(value: i64) -> VaultResult<u8> {
     Ok(value)
 }
 
-fn positive_u16(value: i64) -> VaultResult<u16> {
+pub(super) fn positive_u16(value: i64) -> VaultResult<u16> {
     let value = u16::try_from(value).map_err(|_| VaultError::InvalidFormat)?;
     if value == 0 {
         return Err(VaultError::UnsupportedVersion);
@@ -1252,7 +1252,7 @@ fn positive_u16(value: i64) -> VaultResult<u16> {
     Ok(value)
 }
 
-fn positive_u32(value: i64) -> VaultResult<u32> {
+pub(super) fn positive_u32(value: i64) -> VaultResult<u32> {
     let value = u32::try_from(value).map_err(|_| VaultError::InvalidFormat)?;
     if value == 0 {
         return Err(VaultError::UnsupportedVersion);
@@ -1260,7 +1260,7 @@ fn positive_u32(value: i64) -> VaultResult<u32> {
     Ok(value)
 }
 
-fn positive_u64(value: i64) -> VaultResult<u64> {
+pub(super) fn positive_u64(value: i64) -> VaultResult<u64> {
     let value = nonnegative_u64(value)?;
     if value == 0 {
         return Err(VaultError::InvalidFormat);
@@ -1268,7 +1268,7 @@ fn positive_u64(value: i64) -> VaultResult<u64> {
     Ok(value)
 }
 
-fn nonnegative_u64(value: i64) -> VaultResult<u64> {
+pub(super) fn nonnegative_u64(value: i64) -> VaultResult<u64> {
     u64::try_from(value).map_err(|_| VaultError::InvalidFormat)
 }
 

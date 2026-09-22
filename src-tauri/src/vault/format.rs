@@ -17,11 +17,11 @@ pub const MIN_FRAME_LENGTH: usize = 46;
 pub const VAULT_MAGIC: [u8; 12] = *b"AETERNA-VLT\0";
 
 const HEADER_DOMAIN: &[u8; 14] = b"AETERNA-HEADER";
-const HEADER_AAD_VERSION: u8 = 1;
+pub(super) const HEADER_AAD_VERSION: u8 = 1;
 const WRAPPER_DOMAIN: &[u8; 19] = b"AETERNA-WRAPPERS-V1";
 const RECORD_MAGIC: [u8; 8] = *b"AETRREC\0";
 const RECORD_DOMAIN: &[u8; 14] = b"AETERNA-RECORD";
-const RECORD_AAD_VERSION: u8 = 1;
+pub(super) const RECORD_AAD_VERSION: u8 = 1;
 const FRAME_PREFIX_LENGTH: usize = 30;
 const GCM_TAG_LENGTH: usize = 16;
 

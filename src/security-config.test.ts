@@ -23,6 +23,12 @@ describe("Tauri security baseline", () => {
       "allow-vault-cancel-attachment",
       "allow-vault-read-attachment",
       "allow-vault-remove-attachment",
+      "allow-vault-export-choose",
+      "allow-vault-export-start",
+      "allow-vault-import-choose",
+      "allow-vault-import-start",
+      "allow-vault-transfer-status",
+      "allow-vault-transfer-cancel",
     ]);
     expect(tauriConfig.app.security.assetProtocol).toEqual({
       enable: false,

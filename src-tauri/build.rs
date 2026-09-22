@@ -15,6 +15,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             "vault_cancel_attachment",
             "vault_read_attachment",
             "vault_remove_attachment",
+            "vault_export_choose",
+            "vault_export_start",
+            "vault_import_choose",
+            "vault_import_start",
+            "vault_transfer_status",
+            "vault_transfer_cancel",
         ]),
     ))?;
     Ok(())

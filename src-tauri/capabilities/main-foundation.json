@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "main-foundation",
-  "description": "Allows the main local window to call only the narrow I06 local-vault commands.",
+  "description": "Allows the main local window to call only the narrow local-vault and I07 transfer commands.",
   "windows": ["main"],
   "permissions": [
     "allow-vault-status",
@@ -17,6 +17,12 @@
     "allow-vault-commit-attachment",
     "allow-vault-cancel-attachment",
     "allow-vault-read-attachment",
-    "allow-vault-remove-attachment"
+    "allow-vault-remove-attachment",
+    "allow-vault-export-choose",
+    "allow-vault-export-start",
+    "allow-vault-import-choose",
+    "allow-vault-import-start",
+    "allow-vault-transfer-status",
+    "allow-vault-transfer-cancel"
   ]
 }

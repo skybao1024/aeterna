@@ -29,7 +29,10 @@ pub use signing::{
 pub(crate) use hierarchy::{
     create_master_wrapper_with_material, create_recovery_wrapper_with_nonce,
 };
-pub(crate) use primitives::{decrypt_payload, encrypt_payload, fill_random};
+pub(crate) use primitives::{
+    decrypt_payload, encrypt_payload, export_authentication_tag, fill_random,
+    verify_export_authentication_tag,
+};
 pub(crate) use secret::MasterSalt;
 
 pub const CRYPTO_FORMAT_VERSION: u16 = 1;

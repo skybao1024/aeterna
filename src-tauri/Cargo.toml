@@ -33,8 +33,18 @@ zeroize = { version = "=1.9.0", default-features = false, features = ["alloc"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 core-foundation = { version = "=0.10.1", features = ["link"] }
+libc = { version = "=0.2.189", default-features = false }
 objc2 = { version = "=0.6.4", default-features = false, features = ["std"] }
-objc2-app-kit = { version = "=0.3.2", default-features = false, features = ["std", "NSWorkspace"] }
+objc2-app-kit = { version = "=0.3.2", default-features = false, features = [
+  "std",
+  "NSApplication",
+  "NSOpenPanel",
+  "NSPanel",
+  "NSResponder",
+  "NSSavePanel",
+  "NSWindow",
+  "NSWorkspace",
+] }
 objc2-core-graphics = { version = "=0.3.2", default-features = false, features = ["std", "CGEventSource", "CGEventTypes"] }
 objc2-foundation = { version = "=0.3.2", default-features = false, features = ["std", "NSNotification", "NSObject", "NSString"] }
 security-framework-sys = { version = "=2.17.0", features = ["OSX_10_15"] }

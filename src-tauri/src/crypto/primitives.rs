@@ -188,6 +188,47 @@ pub(crate) fn decrypt_payload(
         .map_err(|_| CryptoError::AuthenticationFailed)
 }
 
+pub(crate) fn export_authentication_tag(
+    vdk: &Vdk,
+    salt: &[u8; 32],
+    info: &[u8; 56],
+    nonce: &[u8; AES_NONCE_LENGTH],
+    aad: &[u8; 294],
+) -> CryptoResult<[u8; AES_TAG_LENGTH]> {
+    let hkdf = Hkdf::<Sha256>::new(Some(salt), vdk.expose());
+    let mut key = Zeroizing::new([0_u8; 32]);
+    hkdf.expand(info, &mut *key)
+        .map_err(|_| CryptoError::InvalidInput)?;
+    let cipher = Aes256Gcm::new_from_slice(&*key).map_err(|_| CryptoError::InvalidInput)?;
+    let encrypted = cipher
+        .encrypt(nonce.into(), Payload { msg: &[], aad })
+        .map_err(|_| CryptoError::AuthenticationFailed)?;
+    encrypted.try_into().map_err(|_| CryptoError::InvalidFormat)
+}
+
+pub(crate) fn verify_export_authentication_tag(
+    vdk: &Vdk,
+    salt: &[u8; 32],
+    info: &[u8; 56],
+    nonce: &[u8; AES_NONCE_LENGTH],
+    aad: &[u8; 294],
+    tag: &[u8; AES_TAG_LENGTH],
+) -> CryptoResult<()> {
+    let hkdf = Hkdf::<Sha256>::new(Some(salt), vdk.expose());
+    let mut key = Zeroizing::new([0_u8; 32]);
+    hkdf.expand(info, &mut *key)
+        .map_err(|_| CryptoError::InvalidInput)?;
+    let cipher = Aes256Gcm::new_from_slice(&*key).map_err(|_| CryptoError::InvalidInput)?;
+    let plaintext = cipher
+        .decrypt(nonce.into(), Payload { msg: tag, aad })
+        .map_err(|_| CryptoError::AuthenticationFailed)?;
+    if plaintext.is_empty() {
+        Ok(())
+    } else {
+        Err(CryptoError::InvalidFormat)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use aes_gcm::{
@@ -320,6 +361,61 @@ mod tests {
                     },
                 )
                 .is_err()
+        );
+    }
+
+    #[test]
+    fn export_authentication_is_domain_bound_and_rejects_tampering() {
+        let vdk = super::Vdk::from_bytes([0x11; 32]);
+        let salt = [0x22; 32];
+        let info = [0x33; 56];
+        let nonce = [0x44; 12];
+        let aad = [0x55; 294];
+        let tag = super::export_authentication_tag(&vdk, &salt, &info, &nonce, &aad)
+            .unwrap_or_else(|error| panic!("export authentication failed: {error}"));
+        assert_eq!(tag.len(), 16);
+        assert!(
+            super::verify_export_authentication_tag(&vdk, &salt, &info, &nonce, &aad, &tag).is_ok()
+        );
+
+        let mut changed_info = info;
+        changed_info[0] ^= 1;
+        assert!(
+            super::verify_export_authentication_tag(
+                &vdk,
+                &salt,
+                &changed_info,
+                &nonce,
+                &aad,
+                &tag,
+            )
+            .is_err()
+        );
+        let mut changed_aad = aad;
+        changed_aad[293] ^= 1;
+        assert!(
+            super::verify_export_authentication_tag(
+                &vdk,
+                &salt,
+                &info,
+                &nonce,
+                &changed_aad,
+                &tag,
+            )
+            .is_err()
+        );
+        let mut changed_tag = tag;
+        changed_tag[15] ^= 1;
+        assert!(
+            super::verify_export_authentication_tag(
+                &vdk,
+                &salt,
+                &info,
+                &nonce,
+                &aad,
+                &changed_tag,
+            )
+            .is_err()
         );
     }
 

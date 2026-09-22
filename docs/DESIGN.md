@@ -500,6 +500,13 @@ Owner 忘记 MP 时不能通过普通邮箱验证码直接重置保险箱，否�
 - 导入新设备后必须重新注册设备并创建该设备的 SRS/Recovery Wrapper。
 - UI 显示本地 Vault 版本和最近导出时间，但不向服务端上传文件内容。
 
+The production new-device rule above remains future work. I07 implements only
+same-lineage restoration of the current development vault into an absent local
+target. It preserves the source vault/device/recovery identities and historical
+nonce ledger, does not register a device or create an SRS, and does not claim a
+usable emergency-recovery path. An authentic older package can therefore roll
+local state back after an explicit warning. ADR 0009 owns this limited behavior.
+
 如果所有本地设备和用户保存的备份同时损坏，Aeterna 无法恢复数据。这是 Local-First 模式的明确边界。
 
 ## 10. 本地保险箱设计
@@ -526,6 +533,18 @@ The I06 executable stores the development-local vault only at
 path, raw key, arbitrary filesystem capability, or SQL surface. Device signing
 keys and server refresh tokens remain OS-secure-storage concerns for later
 account/device iterations and do not enter the I06 SQLite database.
+
+[ADR 0009](./adr/0009-portable-export-package-and-atomic-restore-v1.md)
+defines the I07 portable package and restore boundary. Export streams one
+committed SQLite snapshot into a bounded authenticated `.aeterna-vault`
+package, preserves exact encrypted record frames and every nonce reservation,
+and publishes only a complete same-directory mode-0600 file without replacing
+an existing name. Import first copies into app-controlled quarantine, validates
+the complete structure, wrappers, package authentication, nonce ledger, record
+AEAD, and item payloads, then reconstructs a fresh compiled-schema SQLite vault
+and publishes it only when the fixed app-owned target is absent. Raw SQLite
+copy, archive extraction, package SQL, merge, overwrite, and WebView package or
+path access are not supported.
 
 ### 10.2 加密约束
 
@@ -556,6 +575,12 @@ before allocation or KDF work.
 - Tauri capabilities 按窗口、命令和路径最小授权。
 - 恢复窗口、设置窗口和普通内容窗口使用不同 capability。
 - 启用严格 CSP，不在高权限主窗口加载远程脚本。
+
+I07 adds six purpose-specific commands for native choose, typed start,
+status, and cancellation. Native file paths and package bytes remain in Rust;
+the WebView receives only one-shot five-minute lowercase selection/operation
+identifiers and bounded decimal progress. The capability adds no filesystem,
+dialog, shell, network, archive, or generic execution plugin.
 
 ## 11. 云端服务设计
 

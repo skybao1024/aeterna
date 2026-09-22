@@ -2,7 +2,7 @@
   "app": {
     "brand": "Aeterna",
     "windowTitle": "Aeterna 本地保险箱预览",
-    "previewLabel": "I06 本地开发预览"
+    "previewLabel": "I07 本地开发预览"
   },
   "locale": {
     "label": "语言",
@@ -17,7 +17,7 @@
   "setup": {
     "title": "创建本地保险箱",
     "description": "设置主密码，在此设备上保护加密笔记、说明和有大小限制的附件。",
-    "warning": "开发预览：目前不支持恢复、账户绑定、备份或导出。主密码丢失后无法恢复此保险箱。请勿存放无法替代的数据。"
+    "warning": "开发预览：现在可以进行本地加密导出，但仍不支持紧急恢复及账户/设备绑定。主密码丢失后，保险箱及其导出包都无法恢复。请勿存放无法替代的数据。"
   },
   "unlock": {
     "title": "解锁本地保险箱",
@@ -35,7 +35,10 @@
     "inspect": "查看",
     "replace": "替换",
     "remove": "移除",
-    "close": "关闭"
+    "close": "关闭",
+    "exportVault": "导出加密保险箱",
+    "importVault": "导入加密保险箱",
+    "cancelTransfer": "取消传输"
   },
   "fields": {
     "password": "主密码",
@@ -85,6 +88,40 @@
     "deleteDescription": "此操作会从本地保险箱永久删除该项目及其全部附件。存储硬件或备份中可能仍残留可供取证的数据。",
     "delete": "删除项目"
   },
+  "transfer": {
+    "exportConfirmTitle": "导出加密保险箱副本？",
+    "exportConfirmDescription": "导出包中的项目内容仍保持加密，但会暴露结构元数据、数量、大小、时间戳及标识符。请存放在受保护的介质上。现有文件不会被覆盖，导出也不会增加紧急恢复能力。",
+    "importConfirmTitle": "恢复此加密保险箱包？",
+    "importConfirmDescription": "仅可导入到空的本地目标。真实但较旧的导出包可能不含之后的修改。系统会保留来源谱系和当前不可用的开发恢复包装，不会注册新设备。",
+    "importWarning": "如需恢复而不是新建保险箱，请输入导出包的主密码并选择加密包。导入绝不会覆盖现有保险箱，而且可能恢复到较旧状态。",
+    "exportTitle": "导出加密保险箱",
+    "importTitle": "导入加密保险箱",
+    "lastExport": "本次应用会话最近成功导出：{{date}}。此时间不能证明备份的新旧。",
+    "progress": "已处理 {{bytes}} 和 {{entries}} 个条目。",
+    "phases": {
+      "choosing": "正在等待选择文件……",
+      "preparing": "正在准备安全传输……",
+      "snapshotting": "正在打开单一已提交保险箱快照……",
+      "writing": "正在写入已认证的加密记录……",
+      "copying": "正在将所选包复制到私有隔离区……",
+      "validating": "正在验证包结构和兼容性……",
+      "authenticating": "正在认证包和加密记录……",
+      "reconstructing": "正在重建新的本地保险箱……",
+      "verifying": "正在验证重建后的保险箱……",
+      "publishing": "正在以原子方式发布完整文件……",
+      "cancelling": "正在安全取消……",
+      "completed": "传输已完成。",
+      "cancelled": "传输已取消。",
+      "failed": "传输已安全失败。"
+    },
+    "states": {
+      "running": "传输进行中",
+      "cancelling": "正在取消",
+      "completed": "传输完成",
+      "cancelled": "传输已取消",
+      "failed": "传输失败"
+    }
+  },
   "errors": {
     "crypto_authentication_failed": "密码不正确，或经过认证的保险箱数据已被更改。",
     "crypto_randomness_unavailable": "安全随机数暂时不可用。",
@@ -102,10 +139,23 @@
     "vault_invalid_format": "本地保险箱格式无效。",
     "vault_invalid_input": "一个或多个值无效或过长。",
     "vault_io_error": "无法安全访问本地保险箱。",
+    "vault_export_limit_exceeded": "保险箱过大，超出了已批准的导出包限制。",
+    "vault_export_target_exists": "该导出文件名已存在。请选择一个新文件名。",
+    "vault_import_invalid_package": "所选文件不是完整、真实的 Aeterna 导出包。",
+    "vault_import_limit_exceeded": "所选导出包超出了已批准的导入限制。",
+    "vault_import_target_exists": "本地保险箱或相关数据库文件已存在。导入绝不会覆盖它。",
+    "vault_import_unsupported_version": "所选导出包使用了不受支持的格式或加密数据版本。",
     "vault_item_invalid_format": "某个加密项目的格式无效。",
     "vault_item_unsupported_version": "某个加密项目使用了不受支持的版本。",
     "vault_locked": "请先解锁本地保险箱，再访问内容。",
     "vault_not_found": "请求的项目已不存在。",
+    "vault_operation_cancelled": "传输已安全取消。",
+    "vault_operation_in_progress": "请先完成或取消当前保险箱传输。",
+    "vault_operation_not_cancellable": "传输已进入原子步骤，无法再取消。",
+    "vault_operation_not_found": "保险箱传输已过期或已不存在。",
+    "vault_path_rejected": "无法安全使用所选文件位置。",
+    "vault_platform_unsupported": "本迭代仅在 macOS 上提供加密导出和导入。",
+    "vault_selection_not_found": "文件选择已过期、已被使用，或属于其他操作。",
     "vault_uninitialized": "请先创建本地保险箱，再访问内容。",
     "vault_unsupported_version": "本地保险箱使用了不受支持的版本。",
     "vault_upload_not_found": "附件传输已过期、已取消或已被使用。",
