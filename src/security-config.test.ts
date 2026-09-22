@@ -4,11 +4,26 @@ import capability from "../src-tauri/capabilities/main-foundation.json";
 import tauriConfig from "../src-tauri/tauri.conf.json";
 
 describe("Tauri security baseline", () => {
-  it("grants the main window only the narrow foundation command", () => {
+  it("grants the main window only the approved vault commands", () => {
     expect(tauriConfig.identifier).toBe("dev.aeterna.desktop.foundation");
     expect(tauriConfig.app.security.capabilities).toEqual(["main-foundation"]);
     expect(capability.windows).toEqual(["main"]);
-    expect(capability.permissions).toEqual(["allow-check-desktop-foundation"]);
+    expect(capability.permissions).toEqual([
+      "allow-vault-status",
+      "allow-vault-initialize",
+      "allow-vault-unlock",
+      "allow-vault-lock",
+      "allow-vault-list-items",
+      "allow-vault-get-item",
+      "allow-vault-create-item",
+      "allow-vault-update-item",
+      "allow-vault-delete-item",
+      "allow-vault-prepare-attachment",
+      "allow-vault-commit-attachment",
+      "allow-vault-cancel-attachment",
+      "allow-vault-read-attachment",
+      "allow-vault-remove-attachment",
+    ]);
     expect(tauriConfig.app.security.assetProtocol).toEqual({
       enable: false,
       scope: [],

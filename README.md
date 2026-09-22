@@ -1,15 +1,16 @@
 # Aeterna desktop client
 
-Aeterna is a local-first desktop application. This repository currently contains
-the I00 engineering foundation: a Tauri v2 shell with React, strict TypeScript,
-Rust, local-only assets, and a deliberately narrow IPC boundary. It also contains
-the development-only I01/I04 platform activity probes and I02/I04 cryptography
-and secure-storage risk prototypes. It does not implement production activity
-detection, vault storage, recovery, device registration, or network services.
+Aeterna is a local-first desktop application. This repository contains the I00
+Tauri/React engineering foundation, development-only I01/I04 platform activity
+probes, I02/I04 cryptography and secure-storage risk prototypes, the accepted
+I05 encrypted SQLite record store, and the I06 local vault-item workflow. It
+does not implement production activity detection, recovery, backup/export,
+device registration, synchronization, or network services.
 
-The application identifier is `dev.aeterna.desktop.foundation`. It is explicitly
-development-only; it does not reserve a production signing identity or stable
-persistence path.
+The application identifier is `dev.aeterna.desktop.foundation`. It is
+explicitly development-only and does not reserve a production signing identity.
+I06 uses that development identifier's fixed application-local-data directory,
+so its local vault must not be treated as production or irreplaceable storage.
 
 ## Prerequisites
 
@@ -175,13 +176,17 @@ complete application is available. macOS checks are regression evidence only.
 
 ## Security boundary
 
-The main WebView receives one application permission:
-`allow-check-desktop-foundation`. That command accepts one bounded display name,
-rejects malformed input at the Rust boundary, and returns structured status data.
-No filesystem, shell, SQL, updater, autostart, global-input, telemetry, or network
-plugin is present. The feature-gated I01 native adapter does not add a WebView
-capability. The I02/I04 storage modules and opt-in probes likewise add no WebView
-capability. The Windows development autostart action writes only its exact
-temporary current-user Run value and must remove it after testing. See
-`docs/DESIGN.md` for the product trust boundaries and
-`docs/DEPENDENCIES.md` for the dependency review.
+The main WebView receives exactly fourteen purpose-specific I06 permissions for
+vault status, development initialization, unlock/lock, item CRUD, and bounded
+attachment prepare/commit/cancel/read/remove. Rust owns the fixed app-local
+path, unlocked session, validation, canonical item payload, encryption, and
+persistence. Attachment upload/download uses bounded raw IPC; no arbitrary
+path, raw SQL, raw key, generic crypto, filesystem, dialog, shell, HTTP,
+clipboard, updater, telemetry, or network permission/plugin is present.
+
+I06 initialization deliberately discards recovery material. The UI warns that
+recovery, account binding, backup, and export are unavailable, losing the
+master password loses access, and irreplaceable data must not be stored. The
+feature-gated I01 native adapter, I02/I04 storage modules, and opt-in probes add
+no WebView capability. See `docs/DESIGN.md`, ADR 0007, ADR 0008, and
+`docs/DEPENDENCIES.md` for the governing boundaries.

@@ -1,10 +1,8 @@
 {
   "app": {
     "brand": "Aeterna",
-    "windowTitle": "Aeterna 开发基础",
-    "eyebrow": "桌面工程基础",
-    "title": "为必须经得起时间考验的工作打下安静的基础。",
-    "description": "此开发外壳仅验证本地 React、Rust 与 Tauri 边界，不实现产品功能。"
+    "windowTitle": "Aeterna 本地保险箱预览",
+    "previewLabel": "I06 本地开发预览"
   },
   "locale": {
     "label": "语言",
@@ -12,20 +10,106 @@
     "switch": "切换到英语",
     "switchLabel": "语言：切换到英语"
   },
-  "ipc": {
-    "label": "原生边界",
-    "contributor": "贡献者",
-    "checking": "正在检查受限的 Rust 命令……",
-    "ready": "{{name}}的原生 IPC 已就绪。",
-    "unavailable": "当前环境无法使用原生 IPC。"
+  "status": {
+    "checking": "正在检查本地保险箱……",
+    "unavailable": "当前环境无法使用本地保险箱。"
   },
-  "foundation": {
-    "iteration": "I00",
-    "label": "I00 范围",
-    "items": {
-      "local": "仅使用本地资源",
-      "permissions": "最小权限能力",
-      "toolchain": "固定工具链版本"
-    }
+  "setup": {
+    "title": "创建本地保险箱",
+    "description": "设置主密码，在此设备上保护加密笔记、说明和有大小限制的附件。",
+    "warning": "开发预览：目前不支持恢复、账户绑定、备份或导出。主密码丢失后无法恢复此保险箱。请勿存放无法替代的数据。"
+  },
+  "unlock": {
+    "title": "解锁本地保险箱",
+    "description": "请输入主密码。每次应用重新启动后，保险箱都会保持锁定。"
+  },
+  "actions": {
+    "initialize": "创建本地保险箱",
+    "unlock": "解锁",
+    "lock": "锁定",
+    "newItem": "新建项目",
+    "save": "保存",
+    "delete": "删除",
+    "cancel": "取消",
+    "addAttachment": "添加附件",
+    "inspect": "查看",
+    "replace": "替换",
+    "remove": "移除",
+    "close": "关闭"
+  },
+  "fields": {
+    "password": "主密码",
+    "confirmPassword": "确认主密码",
+    "kind": "项目类型",
+    "title": "标题",
+    "category": "分类",
+    "contactExplanation": "联系人说明",
+    "body": "正文"
+  },
+  "kinds": {
+    "note": "笔记",
+    "instruction": "说明"
+  },
+  "items": {
+    "heading": "保险箱项目",
+    "listLabel": "加密保险箱项目",
+    "empty": "尚无加密项目。"
+  },
+  "editor": {
+    "emptyTitle": "选择一个项目或新建项目",
+    "emptyDescription": "仅在保险箱解锁期间解密项目标题和内容。",
+    "editing": "正在编辑加密项目",
+    "creating": "正在创建加密项目",
+    "newTitle": "新保险箱项目",
+    "updated": "更新于 {{date}}"
+  },
+  "attachments": {
+    "heading": "附件",
+    "limit": "每个项目最多 8 个文件，附件内容总计不超过 768 KiB。",
+    "fileInput": "选择附件文件",
+    "saveFirst": "请先保存此项目，再添加附件。",
+    "saveChangesFirst": "请先保存文字修改，再管理附件。",
+    "empty": "没有附件。",
+    "unknownType": "未验证类型",
+    "previewTitle": "查看 {{filename}}",
+    "textPreview": "纯文本查看。文件类型和扩展名均不受信任。",
+    "binaryPreview": "十六进制查看。文件类型和扩展名均不受信任。",
+    "emptyContent": "此附件为空。",
+    "previewTruncated": "查看器仅显示此附件的开头部分。"
+  },
+  "confirm": {
+    "unsavedTitle": "放弃未保存的修改？",
+    "unsavedDescription": "当前编辑内容尚未加密并保存。",
+    "discard": "放弃修改",
+    "deleteTitle": "删除此加密项目？",
+    "deleteDescription": "此操作会从本地保险箱永久删除该项目及其全部附件。存储硬件或备份中可能仍残留可供取证的数据。",
+    "delete": "删除项目"
+  },
+  "errors": {
+    "crypto_authentication_failed": "密码不正确，或经过认证的保险箱数据已被更改。",
+    "crypto_randomness_unavailable": "安全随机数暂时不可用。",
+    "ipc_invalid_request": "安全应用边界拒绝了此请求。",
+    "ipc_invalid_response": "原生应用返回了无效响应。",
+    "ipc_unavailable": "原生应用边界不可用。",
+    "ui_password_mismatch": "两次输入的主密码不一致。",
+    "vault_already_initialized": "本地保险箱已存在。",
+    "vault_attachment_not_found": "附件已不存在。",
+    "vault_attachment_too_large": "此附件会超过每个项目 768 KiB 的限制。",
+    "vault_busy": "本地保险箱正忙。请在当前操作完成后重试。",
+    "vault_conflict": "此项目已在其他位置发生更改。请重新加载后再保存。",
+    "vault_corrupt": "本地保险箱未通过完整性检查。",
+    "vault_internal_error": "本地保险箱进入了无效的内部状态。",
+    "vault_invalid_format": "本地保险箱格式无效。",
+    "vault_invalid_input": "一个或多个值无效或过长。",
+    "vault_io_error": "无法安全访问本地保险箱。",
+    "vault_item_invalid_format": "某个加密项目的格式无效。",
+    "vault_item_unsupported_version": "某个加密项目使用了不受支持的版本。",
+    "vault_locked": "请先解锁本地保险箱，再访问内容。",
+    "vault_not_found": "请求的项目已不存在。",
+    "vault_uninitialized": "请先创建本地保险箱，再访问内容。",
+    "vault_unsupported_version": "本地保险箱使用了不受支持的版本。",
+    "vault_upload_not_found": "附件传输已过期、已取消或已被使用。",
+    "vault_upload_pending": "请先完成或取消当前附件传输。",
+    "generic": "无法安全完成此操作。"
   }
 }

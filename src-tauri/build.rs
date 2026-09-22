@@ -1,7 +1,21 @@
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    tauri_build::try_build(
-        tauri_build::Attributes::new()
-            .app_manifest(tauri_build::AppManifest::new().commands(&["check_desktop_foundation"])),
-    )?;
+    tauri_build::try_build(tauri_build::Attributes::new().app_manifest(
+        tauri_build::AppManifest::new().commands(&[
+            "vault_status",
+            "vault_initialize",
+            "vault_unlock",
+            "vault_lock",
+            "vault_list_items",
+            "vault_get_item",
+            "vault_create_item",
+            "vault_update_item",
+            "vault_delete_item",
+            "vault_prepare_attachment",
+            "vault_commit_attachment",
+            "vault_cancel_attachment",
+            "vault_read_attachment",
+            "vault_remove_attachment",
+        ]),
+    ))?;
     Ok(())
 }

@@ -1,7 +1,22 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "main-foundation",
-  "description": "Allows the main local window to call only the I00 foundation smoke command.",
+  "description": "Allows the main local window to call only the narrow I06 local-vault commands.",
   "windows": ["main"],
-  "permissions": ["allow-check-desktop-foundation"]
+  "permissions": [
+    "allow-vault-status",
+    "allow-vault-initialize",
+    "allow-vault-unlock",
+    "allow-vault-lock",
+    "allow-vault-list-items",
+    "allow-vault-get-item",
+    "allow-vault-create-item",
+    "allow-vault-update-item",
+    "allow-vault-delete-item",
+    "allow-vault-prepare-attachment",
+    "allow-vault-commit-attachment",
+    "allow-vault-cancel-attachment",
+    "allow-vault-read-attachment",
+    "allow-vault-remove-attachment"
+  ]
 }

@@ -1,10 +1,8 @@
 {
   "app": {
     "brand": "Aeterna",
-    "windowTitle": "Aeterna development foundation",
-    "eyebrow": "Desktop engineering foundation",
-    "title": "A quiet foundation for work that must endure.",
-    "description": "This development shell proves the local React, Rust, and Tauri boundary without implementing product features."
+    "windowTitle": "Aeterna local vault preview",
+    "previewLabel": "I06 local development preview"
   },
   "locale": {
     "label": "Language",
@@ -12,20 +10,106 @@
     "switch": "Switch to Simplified Chinese",
     "switchLabel": "Language: Switch to Simplified Chinese"
   },
-  "ipc": {
-    "label": "Native boundary",
-    "contributor": "Contributor",
-    "checking": "Checking the narrow Rust command…",
-    "ready": "Native IPC is ready for {{name}}.",
-    "unavailable": "Native IPC is unavailable in this environment."
+  "status": {
+    "checking": "Checking the local vault…",
+    "unavailable": "The local vault is unavailable in this environment."
   },
-  "foundation": {
-    "iteration": "I00",
-    "label": "I00 scope",
-    "items": {
-      "local": "Local assets only",
-      "permissions": "Least-privilege capabilities",
-      "toolchain": "Pinned toolchains"
-    }
+  "setup": {
+    "title": "Create a local vault",
+    "description": "Choose a master password to protect encrypted notes, instructions, and bounded attachments on this device.",
+    "warning": "Development preview: recovery, account binding, backup, and export are not available. If you lose the master password, this vault cannot be recovered. Do not store irreplaceable data."
+  },
+  "unlock": {
+    "title": "Unlock your local vault",
+    "description": "Enter the master password. The vault starts locked after every application restart."
+  },
+  "actions": {
+    "initialize": "Create local vault",
+    "unlock": "Unlock",
+    "lock": "Lock",
+    "newItem": "New item",
+    "save": "Save",
+    "delete": "Delete",
+    "cancel": "Cancel",
+    "addAttachment": "Add attachment",
+    "inspect": "Inspect",
+    "replace": "Replace",
+    "remove": "Remove",
+    "close": "Close"
+  },
+  "fields": {
+    "password": "Master password",
+    "confirmPassword": "Confirm master password",
+    "kind": "Item kind",
+    "title": "Title",
+    "category": "Category",
+    "contactExplanation": "Contact explanation",
+    "body": "Body"
+  },
+  "kinds": {
+    "note": "Note",
+    "instruction": "Instruction"
+  },
+  "items": {
+    "heading": "Vault items",
+    "listLabel": "Encrypted vault items",
+    "empty": "No encrypted items yet."
+  },
+  "editor": {
+    "emptyTitle": "Choose an item or create one",
+    "emptyDescription": "Item titles and content are decrypted only while this vault is unlocked.",
+    "editing": "Editing encrypted item",
+    "creating": "Creating encrypted item",
+    "newTitle": "New vault item",
+    "updated": "Updated {{date}}"
+  },
+  "attachments": {
+    "heading": "Attachments",
+    "limit": "Up to 8 files and 768 KiB of attachment content per item.",
+    "fileInput": "Choose an attachment file",
+    "saveFirst": "Save this item before adding attachments.",
+    "saveChangesFirst": "Save text changes before managing attachments.",
+    "empty": "No attachments.",
+    "unknownType": "Unverified type",
+    "previewTitle": "Inspect {{filename}}",
+    "textPreview": "Plain-text inspection. File type and extension are not trusted.",
+    "binaryPreview": "Hexadecimal inspection. File type and extension are not trusted.",
+    "emptyContent": "This attachment is empty.",
+    "previewTruncated": "The inspector shows only the beginning of this attachment."
+  },
+  "confirm": {
+    "unsavedTitle": "Discard unsaved changes?",
+    "unsavedDescription": "Your current edits have not been encrypted and saved.",
+    "discard": "Discard changes",
+    "deleteTitle": "Delete this encrypted item?",
+    "deleteDescription": "This permanently deletes the item and all of its attachments from the local vault. Storage hardware or backups may retain forensic remnants.",
+    "delete": "Delete item"
+  },
+  "errors": {
+    "crypto_authentication_failed": "The password is incorrect, or the authenticated vault data was changed.",
+    "crypto_randomness_unavailable": "Secure randomness is temporarily unavailable.",
+    "ipc_invalid_request": "The request was rejected at the secure application boundary.",
+    "ipc_invalid_response": "The native application returned an invalid response.",
+    "ipc_unavailable": "The native application boundary is unavailable.",
+    "ui_password_mismatch": "The master passwords do not match.",
+    "vault_already_initialized": "A local vault already exists.",
+    "vault_attachment_not_found": "The attachment no longer exists.",
+    "vault_attachment_too_large": "The attachment would exceed the 768 KiB item limit.",
+    "vault_busy": "The local vault is busy. Try again after the current operation finishes.",
+    "vault_conflict": "This item changed elsewhere. Reload it before saving.",
+    "vault_corrupt": "The local vault failed an integrity check.",
+    "vault_internal_error": "The local vault entered an invalid internal state.",
+    "vault_invalid_format": "The local vault format is invalid.",
+    "vault_invalid_input": "One or more values are invalid or too long.",
+    "vault_io_error": "The local vault could not be accessed safely.",
+    "vault_item_invalid_format": "An encrypted item has an invalid format.",
+    "vault_item_unsupported_version": "An encrypted item uses an unsupported version.",
+    "vault_locked": "Unlock the local vault before accessing content.",
+    "vault_not_found": "The requested item no longer exists.",
+    "vault_uninitialized": "Create the local vault before accessing content.",
+    "vault_unsupported_version": "The local vault uses an unsupported version.",
+    "vault_upload_not_found": "The attachment transfer expired, was cancelled, or was already used.",
+    "vault_upload_pending": "Finish or cancel the current attachment transfer first.",
+    "generic": "The operation could not be completed safely."
   }
 }

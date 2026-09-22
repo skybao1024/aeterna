@@ -506,59 +506,26 @@ Owner 忘记 MP 时不能通过普通邮箱验证码直接重置保险箱，否�
 
 ### 10.1 本地数据模型
 
-```sql
-CREATE TABLE vault_meta (
-    vault_id TEXT PRIMARY KEY,
-    schema_version INTEGER NOT NULL,
-    crypto_version INTEGER NOT NULL,
-    kdf_algorithm TEXT NOT NULL,
-    kdf_params_json TEXT NOT NULL,
-    kdf_salt BLOB NOT NULL,
-    master_wrap_nonce BLOB NOT NULL,
-    master_wrapped_vdk BLOB NOT NULL,
-    created_at INTEGER NOT NULL,
-    updated_at INTEGER NOT NULL
-);
+The accepted physical v1 schema and authenticated record format are defined by
+[ADR 0007](./adr/0007-local-vault-format-v1.md), rather than by an illustrative
+logical SQL schema in this document. The database exposes only structural
+container, wrapper, nonce-ledger, migration, and record metadata. It has no
+plaintext title, category, contact explanation, body, attachment metadata, or
+attachment-content column.
 
-CREATE TABLE recovery_wrappers (
-    recovery_id TEXT PRIMARY KEY,
-    vault_id TEXT NOT NULL,
-    device_id TEXT NOT NULL,
-    crypto_version INTEGER NOT NULL,
-    recovery_wrap_nonce BLOB NOT NULL,
-    recovery_wrapped_vdk BLOB NOT NULL,
-    created_at INTEGER NOT NULL,
-    FOREIGN KEY (vault_id) REFERENCES vault_meta(vault_id)
-);
+[ADR 0008](./adr/0008-vault-item-payload-and-session-ipc.md) defines the I06
+logical item model. One item, including zero through eight attachments, is one
+canonical encrypted `vault_records` payload. Attachment metadata and bytes are
+inside that same authenticated payload; v1 has no attachment table, side file,
+user-derived app filename, or schema migration. The aggregate attachment
+content bound is exactly 786,432 bytes and the complete encoded item remains
+within the ADR 0007 1,048,576-byte plaintext ceiling.
 
-CREATE TABLE vault_items (
-    id TEXT PRIMARY KEY,
-    vault_id TEXT NOT NULL,
-    encrypted_payload BLOB NOT NULL,
-    nonce BLOB NOT NULL,
-    crypto_version INTEGER NOT NULL,
-    created_at INTEGER NOT NULL,
-    updated_at INTEGER NOT NULL,
-    FOREIGN KEY (vault_id) REFERENCES vault_meta(vault_id)
-);
-
-CREATE TABLE attachments (
-    id TEXT PRIMARY KEY,
-    vault_id TEXT NOT NULL,
-    encrypted_path TEXT NOT NULL,
-    encrypted_metadata BLOB NOT NULL,
-    crypto_version INTEGER NOT NULL,
-    created_at INTEGER NOT NULL,
-    FOREIGN KEY (vault_id) REFERENCES vault_meta(vault_id)
-);
-
-CREATE TABLE local_config (
-    key TEXT PRIMARY KEY,
-    value TEXT NOT NULL
-);
-```
-
-资产标题、分类、联系人说明和正文都进入 `encrypted_payload`，不作为明文索引列。设备签名私钥和服务端 Refresh Token 不进入 SQLite，而是进入系统安全凭据存储。
+The I06 executable stores the development-local vault only at
+`app_local_data_dir()/vault/aeterna-vault.sqlite3`. React receives no database
+path, raw key, arbitrary filesystem capability, or SQL surface. Device signing
+keys and server refresh tokens remain OS-secure-storage concerns for later
+account/device iterations and do not enter the I06 SQLite database.
 
 ### 10.2 加密约束
 
@@ -566,7 +533,9 @@ CREATE TABLE local_config (
 - 不重复使用同一个 `(key, nonce)`。
 - 所有格式包含明确的 `crypto_version`。
 - 不自定义新的加密算法或未经审计的流式加密模式。
-- 大附件必须使用经过审计的流式 AEAD 实现；在实现选型完成前，原型限制附件大小并使用整文件 AEAD。
+- Large attachments require a separately reviewed streaming AEAD design. I06
+  instead caps aggregate attachment content at 786,432 bytes and encrypts the
+  complete item as one ADR 0007 record.
 - Rust 内存中的密码和密钥使用 `secrecy`/`zeroize` 等机制尽快清理。
 - 禁止在日志、panic、遥测、剪贴板历史或错误信息中输出秘密。
 

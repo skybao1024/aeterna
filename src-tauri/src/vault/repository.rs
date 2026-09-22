@@ -164,11 +164,15 @@ impl fmt::Debug for RecordId {
 pub struct RecordVersion {
     pub id: RecordId,
     pub generation: u64,
+    pub created_at_ms: u64,
+    pub updated_at_ms: u64,
 }
 
 pub struct DecryptedRecord {
     pub id: RecordId,
     pub generation: u64,
+    pub created_at_ms: u64,
+    pub updated_at_ms: u64,
     plaintext: Zeroizing<Vec<u8>>,
 }
 
@@ -184,6 +188,8 @@ impl fmt::Debug for DecryptedRecord {
             .debug_struct("DecryptedRecord")
             .field("id", &self.id)
             .field("generation", &self.generation)
+            .field("created_at_ms", &self.created_at_ms)
+            .field("updated_at_ms", &self.updated_at_ms)
             .field("plaintext", &"[REDACTED]")
             .finish()
     }
@@ -467,6 +473,8 @@ impl UnlockedVault {
         Ok(RecordVersion {
             id: RecordId(record_id),
             generation: 1,
+            created_at_ms: now,
+            updated_at_ms: now,
         })
     }
 
@@ -513,8 +521,62 @@ impl UnlockedVault {
         Ok(DecryptedRecord {
             id,
             generation,
+            created_at_ms,
+            updated_at_ms,
             plaintext,
         })
+    }
+
+    pub(super) fn map_records<T>(
+        &self,
+        mut map: impl FnMut(DecryptedRecord) -> VaultResult<T>,
+    ) -> VaultResult<Vec<T>> {
+        let connection = self.repository.connection()?;
+        let mut statement = connection.prepare(
+            "SELECT record_id, generation, frame, created_at_ms, updated_at_ms
+             FROM vault_records
+             ORDER BY updated_at_ms DESC, record_id ASC",
+        )?;
+        let mut rows = statement.query([])?;
+        let mut output = Vec::new();
+        while let Some(row) = rows.next()? {
+            let record_id = row.get::<_, Vec<u8>>(0)?;
+            let id = RecordId(read_array(&record_id)?);
+            let generation = positive_u64(row.get(1)?)?;
+            let frame = row.get::<_, Vec<u8>>(2)?;
+            let created_at_ms = nonnegative_u64(row.get(3)?)?;
+            let updated_at_ms = nonnegative_u64(row.get(4)?)?;
+            if updated_at_ms < created_at_ms {
+                return Err(VaultError::InvalidFormat);
+            }
+            let decoded = decode_frame(&frame)?;
+            verify_reserved_nonce(&connection, &decoded.nonce, RECORD_NONCE_PURPOSE)?;
+            let aad = record_aad(
+                self.vault_id,
+                id.0,
+                generation,
+                created_at_ms,
+                updated_at_ms,
+                decoded.plaintext_length,
+            )?;
+            let plaintext =
+                decrypt_payload(&self.vdk, &decoded.nonce, decoded.ciphertext_and_tag, &aad)?;
+            if plaintext.len() != decoded.plaintext_length {
+                return Err(VaultError::InvalidFormat);
+            }
+            output.push(map(DecryptedRecord {
+                id,
+                generation,
+                created_at_ms,
+                updated_at_ms,
+                plaintext,
+            })?);
+        }
+        Ok(output)
+    }
+
+    pub(super) fn random_identifier(&self) -> VaultResult<[u8; 16]> {
+        random_array(self.repository.runtime.random.as_ref())
     }
 
     pub fn update_record(
@@ -587,7 +649,12 @@ impl UnlockedVault {
             return Err(VaultError::Conflict);
         }
         transaction.commit()?;
-        Ok(RecordVersion { id, generation })
+        Ok(RecordVersion {
+            id,
+            generation,
+            created_at_ms,
+            updated_at_ms,
+        })
     }
 
     pub fn delete_record(&self, id: RecordId, expected_generation: u64) -> VaultResult<()> {
@@ -1349,6 +1416,8 @@ mod tests {
         let record = DecryptedRecord {
             id: RecordId([1; 16]),
             generation: 1,
+            created_at_ms: 1,
+            updated_at_ms: 1,
             plaintext: Zeroizing::new(b"secret marker".to_vec()),
         };
         assert!(!format!("{record:?}").contains("secret marker"));
