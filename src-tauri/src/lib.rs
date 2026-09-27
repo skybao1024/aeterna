@@ -2,6 +2,7 @@ pub mod activity;
 pub mod crypto;
 #[cfg(target_os = "macos")]
 mod file_panel;
+pub mod heartbeat;
 mod ipc;
 pub mod protocol;
 pub mod secure_storage;

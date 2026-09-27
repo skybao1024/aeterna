@@ -1,9 +1,9 @@
 # Aeterna public protocol v1
 
 This directory is the public, machine-readable source of truth for Aeterna I09
-account verification and device binding. Private database models, generated
-OpenAPI output, and desktop implementation types are consumers, not protocol
-authority.
+account/device binding and I10 signed heartbeat/device-status operations.
+Private database models, generated OpenAPI output, and desktop implementation
+types are consumers, not protocol authority.
 
 ## Transport
 
@@ -29,6 +29,12 @@ active device uses `aeterna.device-binding.approval.v1`. Operation names prevent
 replay between initial request, delayed confirmation, cancellation, and
 existing-device approval.
 
+An active device submits heartbeats under `aeterna.heartbeat.submit.v1` and
+changes device eligibility under `aeterna.device-status.change.v1`. These
+domains are not interchangeable with each other or with device binding. A
+heartbeat signs only account/device routing identifiers, a request identifier,
+and a positive monotonic sequence. It contains no client time or deadline.
+
 ## Publication and compatibility
 
 `manifest.json` hashes every normative file and contains a release digest over
@@ -36,7 +42,7 @@ the RFC 8785 canonical manifest without `release_digest`. The private control
 plane vendors this exact package, pins the release tag and digest, and runs the
 same fixtures.
 
-The prepared release is `1.0.0` with tag name `protocol-v1.0.0`; preparing the
+The prepared release is `1.1.0` with tag name `protocol-v1.1.0`; preparing the
 manifest does not create or publish a Git tag. Signed field changes and security
 semantic changes require a new major/versioned operation as defined by ADR 0012. The prior major remains supported for at least 180 days after a successor
 reaches general availability, with at least 90 days' sunset notice unless a
@@ -44,8 +50,10 @@ separate urgent security decision records a shorter migration.
 
 ## Privacy boundary
 
-I09 contains only Owner email verification, opaque authorization material,
-request/account/device/binding identifiers, public keys, signatures, challenges,
-and binding state. Unknown fields are rejected. There is no heartbeat, activity,
-application/window/URL data, local encrypted content, recovery secret, contact,
-or custom notification payload in this package.
+The package contains only Owner email verification, opaque authorization
+material, request/account/device/binding identifiers, public keys, signatures,
+challenges, device state, and the minimum monotonic heartbeat sequence and
+server receipt response. Unknown fields are rejected. There is no activity
+type or observation, client timestamp or deadline, application/window/URL data,
+input value, local encrypted content, recovery secret, contact, or custom
+notification payload.

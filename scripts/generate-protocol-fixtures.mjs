@@ -16,6 +16,15 @@ const crossDomainPath = `${protocolDirectory}fixtures/signatures/device-binding-
 const canonicalizationPath = `${protocolDirectory}fixtures/signatures/jcs-unicode-and-escaping.json`;
 const paddedSignaturePath = `${protocolDirectory}fixtures/invalid/device-binding-request-signature-padding.json`;
 const duplicateMemberPath = `${protocolDirectory}fixtures/invalid/account-challenge-duplicate-member.json`;
+const heartbeatSignaturePath = `${protocolDirectory}fixtures/signatures/heartbeat-request.json`;
+const heartbeatValidPath = `${protocolDirectory}fixtures/valid/heartbeat-request.json`;
+const heartbeatResponsePath = `${protocolDirectory}fixtures/valid/heartbeat-response.json`;
+const heartbeatModifiedPath = `${protocolDirectory}fixtures/signatures/heartbeat-modified-payload.json`;
+const heartbeatCrossDomainPath = `${protocolDirectory}fixtures/signatures/heartbeat-cross-domain-replay.json`;
+const heartbeatForbiddenPath = `${protocolDirectory}fixtures/invalid/heartbeat-request-forbidden-data.json`;
+const deviceStatusSignaturePath = `${protocolDirectory}fixtures/signatures/device-status-change.json`;
+const deviceStatusValidPath = `${protocolDirectory}fixtures/valid/device-status-change-request.json`;
+const deviceStatusResponsePath = `${protocolDirectory}fixtures/valid/device-status-change-response.json`;
 const checkOnly = process.argv.includes("--check");
 
 function canonicalize(value) {
@@ -192,6 +201,124 @@ const duplicateMemberFixture = `{
 }
 `;
 
+const heartbeatDocument = {
+  account_id: "00000000-0000-4000-8000-000000000020",
+  canonicalization: "jcs-rfc8785",
+  device_id: "00000000-0000-4000-8000-000000000003",
+  domain: "aeterna.heartbeat.submit.v1",
+  operation: "heartbeat.submit",
+  protocol_version: 1,
+  request_id: "00000000-0000-4000-8000-000000000030",
+  sequence: 41,
+  signature_version: 1,
+};
+const heartbeatCanonicalBytes = Buffer.from(
+  canonicalize(heartbeatDocument),
+  "utf8",
+);
+const heartbeatSignature = sign(
+  null,
+  heartbeatCanonicalBytes,
+  primary.privateKey,
+);
+const heartbeatEnvelope = {
+  protocol_version: 1,
+  signed: heartbeatDocument,
+  signature: base64url(heartbeatSignature),
+};
+const heartbeatSignatureFixture = pretty({
+  fixture_version: 1,
+  seed: base64url(primary.seed),
+  public_key: base64url(primary.publicKey),
+  canonical_bytes: base64url(heartbeatCanonicalBytes),
+  signature: base64url(heartbeatSignature),
+  document: heartbeatDocument,
+});
+const heartbeatModifiedFixture = pretty({
+  fixture_version: 1,
+  expected: "device.proof_invalid",
+  verification_public_key: base64url(primary.publicKey),
+  envelope: {
+    ...heartbeatEnvelope,
+    signed: { ...heartbeatDocument, sequence: heartbeatDocument.sequence + 1 },
+  },
+});
+const heartbeatCrossDomainFixture = pretty({
+  fixture_version: 1,
+  expected: "device.proof_invalid",
+  verification_public_key: base64url(primary.publicKey),
+  envelope: {
+    ...heartbeatEnvelope,
+    signed: {
+      ...heartbeatDocument,
+      domain: "aeterna.device-status.change.v1",
+    },
+  },
+});
+const heartbeatForbiddenFixture = pretty({
+  ...heartbeatEnvelope,
+  signed: {
+    ...heartbeatDocument,
+    client_deadline: "2040-01-01T00:00:00Z",
+  },
+});
+const heartbeatResponseFixture = pretty({
+  protocol_version: 1,
+  request_id: heartbeatDocument.request_id,
+  data: {
+    accepted_at: "2030-01-02T03:04:05Z",
+    accepted_sequence: heartbeatDocument.sequence,
+    account_id: heartbeatDocument.account_id,
+    device_id: heartbeatDocument.device_id,
+    next_heartbeat_not_before: "2030-01-02T03:34:05Z",
+  },
+});
+
+const deviceStatusDocument = {
+  account_id: heartbeatDocument.account_id,
+  action: "mark_lost",
+  authorizing_device_id: heartbeatDocument.device_id,
+  canonicalization: "jcs-rfc8785",
+  domain: "aeterna.device-status.change.v1",
+  operation: "device_status.change",
+  protocol_version: 1,
+  request_id: "00000000-0000-4000-8000-000000000031",
+  signature_version: 1,
+  target_device_id: "00000000-0000-4000-8000-000000000004",
+};
+const deviceStatusCanonicalBytes = Buffer.from(
+  canonicalize(deviceStatusDocument),
+  "utf8",
+);
+const deviceStatusSignature = sign(
+  null,
+  deviceStatusCanonicalBytes,
+  primary.privateKey,
+);
+const deviceStatusEnvelope = {
+  protocol_version: 1,
+  signed: deviceStatusDocument,
+  signature: base64url(deviceStatusSignature),
+};
+const deviceStatusSignatureFixture = pretty({
+  fixture_version: 1,
+  seed: base64url(primary.seed),
+  public_key: base64url(primary.publicKey),
+  canonical_bytes: base64url(deviceStatusCanonicalBytes),
+  signature: base64url(deviceStatusSignature),
+  document: deviceStatusDocument,
+});
+const deviceStatusResponseFixture = pretty({
+  protocol_version: 1,
+  request_id: deviceStatusDocument.request_id,
+  data: {
+    account_id: deviceStatusDocument.account_id,
+    changed_at: "2030-01-02T03:04:05Z",
+    device_id: deviceStatusDocument.target_device_id,
+    status: "lost",
+  },
+});
+
 async function updateOrCheck(path, expected) {
   if (!checkOnly) {
     await writeFile(path, expected, "utf8");
@@ -213,6 +340,15 @@ await updateOrCheck(crossDomainPath, crossDomainFixture);
 await updateOrCheck(canonicalizationPath, canonicalizationFixture);
 await updateOrCheck(paddedSignaturePath, paddedSignatureFixture);
 await updateOrCheck(duplicateMemberPath, duplicateMemberFixture);
+await updateOrCheck(heartbeatSignaturePath, heartbeatSignatureFixture);
+await updateOrCheck(heartbeatValidPath, pretty(heartbeatEnvelope));
+await updateOrCheck(heartbeatResponsePath, heartbeatResponseFixture);
+await updateOrCheck(heartbeatModifiedPath, heartbeatModifiedFixture);
+await updateOrCheck(heartbeatCrossDomainPath, heartbeatCrossDomainFixture);
+await updateOrCheck(heartbeatForbiddenPath, heartbeatForbiddenFixture);
+await updateOrCheck(deviceStatusSignaturePath, deviceStatusSignatureFixture);
+await updateOrCheck(deviceStatusValidPath, pretty(deviceStatusEnvelope));
+await updateOrCheck(deviceStatusResponsePath, deviceStatusResponseFixture);
 console.log(
   checkOnly
     ? "Verified generated protocol signature fixtures."

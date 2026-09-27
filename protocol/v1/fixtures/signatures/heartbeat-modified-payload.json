@@ -1,0 +1,20 @@
+{
+  "fixture_version": 1,
+  "expected": "device.proof_invalid",
+  "verification_public_key": "0EqyMnQrtKs6E2i9RhXk5tAiSrcaAWuvhSCjMsl3hzc",
+  "envelope": {
+    "protocol_version": 1,
+    "signed": {
+      "account_id": "00000000-0000-4000-8000-000000000020",
+      "canonicalization": "jcs-rfc8785",
+      "device_id": "00000000-0000-4000-8000-000000000003",
+      "domain": "aeterna.heartbeat.submit.v1",
+      "operation": "heartbeat.submit",
+      "protocol_version": 1,
+      "request_id": "00000000-0000-4000-8000-000000000030",
+      "sequence": 42,
+      "signature_version": 1
+    },
+    "signature": "B_j7fa8OIq9B_NXE00bmCmo37x8liGOoZqK82vS_e3ZS09Dwtwo53Do6DoUSA-Fa7Tf3eX8wF8yLI2X4TMhTCg"
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "fixture_version": 1,
+  "seed": "ERERERERERERERERERERERERERERERERERERERERERE",
+  "public_key": "0EqyMnQrtKs6E2i9RhXk5tAiSrcaAWuvhSCjMsl3hzc",
+  "canonical_bytes": "eyJhY2NvdW50X2lkIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDIwIiwiYWN0aW9uIjoibWFya19sb3N0IiwiYXV0aG9yaXppbmdfZGV2aWNlX2lkIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDAzIiwiY2Fub25pY2FsaXphdGlvbiI6Impjcy1yZmM4Nzg1IiwiZG9tYWluIjoiYWV0ZXJuYS5kZXZpY2Utc3RhdHVzLmNoYW5nZS52MSIsIm9wZXJhdGlvbiI6ImRldmljZV9zdGF0dXMuY2hhbmdlIiwicHJvdG9jb2xfdmVyc2lvbiI6MSwicmVxdWVzdF9pZCI6IjAwMDAwMDAwLTAwMDAtNDAwMC04MDAwLTAwMDAwMDAwMDAzMSIsInNpZ25hdHVyZV92ZXJzaW9uIjoxLCJ0YXJnZXRfZGV2aWNlX2lkIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDA0In0",
+  "signature": "nrVdJ6PoeZIXwenGPaB5_DukdWzJkfJgDO-QC4b7Go5Y0gtPRiPAqMkuEEbanzHFGtDYTIYcPtVWPhApq1TfDQ",
+  "document": {
+    "account_id": "00000000-0000-4000-8000-000000000020",
+    "action": "mark_lost",
+    "authorizing_device_id": "00000000-0000-4000-8000-000000000003",
+    "canonicalization": "jcs-rfc8785",
+    "domain": "aeterna.device-status.change.v1",
+    "operation": "device_status.change",
+    "protocol_version": 1,
+    "request_id": "00000000-0000-4000-8000-000000000031",
+    "signature_version": 1,
+    "target_device_id": "00000000-0000-4000-8000-000000000004"
+  }
+}

@@ -26,6 +26,11 @@
       "pattern": "^[A-Za-z0-9_-]{86}$",
       "type": "string"
     },
+    "heartbeatSequence": {
+      "maximum": 9007199254740991,
+      "minimum": 1,
+      "type": "integer"
+    },
     "email": {
       "format": "email",
       "maxLength": 254,
@@ -53,6 +58,10 @@
     },
     "bindingState": {
       "enum": ["active", "pending", "cancelled", "expired"],
+      "type": "string"
+    },
+    "deviceStatus": {
+      "enum": ["active", "dormant", "lost", "revoked"],
       "type": "string"
     }
   }

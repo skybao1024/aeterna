@@ -1,12 +1,12 @@
 {
   "manifest_version": 1,
   "protocol_version": 1,
-  "release": "1.0.0",
-  "release_tag": "protocol-v1.0.0",
+  "release": "1.1.0",
+  "release_tag": "protocol-v1.1.0",
   "files": [
     {
       "path": "errors.json",
-      "sha256": "3f7e319c491da79e4e9f875ccbfc020c2cbd22300308cabcd9735355fa0299ad"
+      "sha256": "decc7db01a06855326e0546fd3f0ed48b1a74f546076f2c11ff9519a9263535a"
     },
     {
       "path": "fixtures/invalid/account-challenge-duplicate-member.json",
@@ -23,6 +23,10 @@
     {
       "path": "fixtures/invalid/device-binding-request-signature-padding.json",
       "sha256": "d16cafb70707582730d4e7231bfe5d2c045b1a9afe4b77326ee90f1973353ed4"
+    },
+    {
+      "path": "fixtures/invalid/heartbeat-request-forbidden-data.json",
+      "sha256": "dde8c921026a16f8b193dabfe2ab6f5c4c8dce96a2778a3969e204f0751ddb7b"
     },
     {
       "path": "fixtures/signatures/device-binding-approval.json",
@@ -43,6 +47,22 @@
     {
       "path": "fixtures/signatures/device-binding-request.json",
       "sha256": "384f0b6ebf214e8295a20e793766e76bc0953943ea520d10b83e531e7162d6fd"
+    },
+    {
+      "path": "fixtures/signatures/device-status-change.json",
+      "sha256": "04c1e4560ea0224196ea6159523c5911596bb567099912252413cb7d1302242a"
+    },
+    {
+      "path": "fixtures/signatures/heartbeat-cross-domain-replay.json",
+      "sha256": "23c0b732a4798518fd26d70b2c580b0f8b478c0bcf946b1ddb63891f458124fd"
+    },
+    {
+      "path": "fixtures/signatures/heartbeat-modified-payload.json",
+      "sha256": "ad58c8df264226229b4dd691862cf57cd58ed953a4e5abb611b60976bf25e64d"
+    },
+    {
+      "path": "fixtures/signatures/heartbeat-request.json",
+      "sha256": "9b05ab0796cb3e2b1540ec471629a6e8c9bddd326a4c6782742ab3ec73261ddd"
     },
     {
       "path": "fixtures/signatures/jcs-unicode-and-escaping.json",
@@ -73,8 +93,24 @@
       "sha256": "1171e64ae344f8031d64defb7091ce8a069957bed990e65091dee8ad1c1b4c3a"
     },
     {
+      "path": "fixtures/valid/device-status-change-request.json",
+      "sha256": "4bb8eb7935b1d357e884949be2604cd528e016140a2a98269ccc6b111fbe364d"
+    },
+    {
+      "path": "fixtures/valid/device-status-change-response.json",
+      "sha256": "a36e2a1ac9d798555e8e15ca92fbdd69205bcb3b5abe31bbbfa21dea1ec914f8"
+    },
+    {
+      "path": "fixtures/valid/heartbeat-request.json",
+      "sha256": "9c9b9f76b97d870b75b29e5189ba4942be1aae1ea7acc18be015302304741fee"
+    },
+    {
+      "path": "fixtures/valid/heartbeat-response.json",
+      "sha256": "de52ecbdc9006dabc0bd768a49aa5041148caa6c31bc1b3e169c3259a99abc21"
+    },
+    {
       "path": "README.md",
-      "sha256": "b6be57760e2f097e9f4b386dba3f370b78c14faa836625d7e2e010e7ddb955f9"
+      "sha256": "8b623339fd80d7574c46afead0d1ea2254161a3b3862c81e2085dd86e1ca3186"
     },
     {
       "path": "schemas/account-challenge-request.schema.json",
@@ -94,7 +130,7 @@
     },
     {
       "path": "schemas/common.schema.json",
-      "sha256": "2f793e51360f485051acf65283a101dc2998ffe3efb583bf4d5a06d8b07b5d69"
+      "sha256": "1b7f94101a288029abdba4a5a1a548993e5b28522d0c93f0cce11a06ce634ce8"
     },
     {
       "path": "schemas/device-binding-approval-request.schema.json",
@@ -117,9 +153,25 @@
       "sha256": "656b2046d8ee5d36c39fc3ad570fc712af704dcfb3c4c906be37a58dd27d41bd"
     },
     {
+      "path": "schemas/device-status-change-request.schema.json",
+      "sha256": "6fc68ee936ececd521d6201a8d5fccdbb7be35fe1a757924862080d6d8664b55"
+    },
+    {
+      "path": "schemas/device-status-change-response.schema.json",
+      "sha256": "277b3dde4f98d05d15dcb83917eb505482d230f2478c4545fc3f6541eae2a487"
+    },
+    {
       "path": "schemas/error-response.schema.json",
       "sha256": "ddb4e2d722a63e1283a5135bc6f0ea7902e2e9bc37d6e51506ac85fcaa740ad0"
+    },
+    {
+      "path": "schemas/heartbeat-request.schema.json",
+      "sha256": "bd274525b8796e7d0bd42237549e4a5912b0f27994377510843c4c21c9624181"
+    },
+    {
+      "path": "schemas/heartbeat-response.schema.json",
+      "sha256": "9b41d0808f550340ded17df86aaf9a46836ee183a82883e310e36ab8b1ed9837"
     }
   ],
-  "release_digest": "a2d4fe59198267d3a246e278c6a0ab196c5f6660ed48b9f1dd276fb22af447fd"
+  "release_digest": "47334129068437fde38acb68ab9310d8e64c95629e2ef95645eb1cd1c7e4e0d9"
 }

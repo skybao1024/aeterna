@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:aeterna:protocol:v1:heartbeat-request",
+  "additionalProperties": false,
+  "properties": {
+    "protocol_version": { "$ref": "common.schema.json#/$defs/protocolVersion" },
+    "signed": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": { "$ref": "common.schema.json#/$defs/uuid" },
+        "canonicalization": {
+          "$ref": "common.schema.json#/$defs/canonicalization"
+        },
+        "device_id": { "$ref": "common.schema.json#/$defs/uuid" },
+        "domain": { "const": "aeterna.heartbeat.submit.v1", "type": "string" },
+        "operation": { "const": "heartbeat.submit", "type": "string" },
+        "protocol_version": {
+          "$ref": "common.schema.json#/$defs/protocolVersion"
+        },
+        "request_id": { "$ref": "common.schema.json#/$defs/uuid" },
+        "sequence": { "$ref": "common.schema.json#/$defs/heartbeatSequence" },
+        "signature_version": {
+          "$ref": "common.schema.json#/$defs/signatureVersion"
+        }
+      },
+      "required": [
+        "account_id",
+        "canonicalization",
+        "device_id",
+        "domain",
+        "operation",
+        "protocol_version",
+        "request_id",
+        "sequence",
+        "signature_version"
+      ],
+      "type": "object"
+    },
+    "signature": { "$ref": "common.schema.json#/$defs/base64url64" }
+  },
+  "required": ["protocol_version", "signed", "signature"],
+  "type": "object"
+}

@@ -1,0 +1,16 @@
+{
+  "protocol_version": 1,
+  "signed": {
+    "account_id": "00000000-0000-4000-8000-000000000020",
+    "action": "mark_lost",
+    "authorizing_device_id": "00000000-0000-4000-8000-000000000003",
+    "canonicalization": "jcs-rfc8785",
+    "domain": "aeterna.device-status.change.v1",
+    "operation": "device_status.change",
+    "protocol_version": 1,
+    "request_id": "00000000-0000-4000-8000-000000000031",
+    "signature_version": 1,
+    "target_device_id": "00000000-0000-4000-8000-000000000004"
+  },
+  "signature": "nrVdJ6PoeZIXwenGPaB5_DukdWzJkfJgDO-QC4b7Go5Y0gtPRiPAqMkuEEbanzHFGtDYTIYcPtVWPhApq1TfDQ"
+}

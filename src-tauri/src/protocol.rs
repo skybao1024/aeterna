@@ -1,8 +1,8 @@
 //! Public Aeterna protocol v1 types and signature canonicalization.
 //!
 //! The machine-readable source of truth lives in `protocol/v1`. These Rust
-//! types deliberately cover only I09 account verification and device binding;
-//! heartbeat, policy, contact, and recovery operations use later protocols.
+//! types cover I09 account/device binding and the I10 signed heartbeat/device
+//! status boundary. Policy, contact, and recovery operations use later work.
 
 use core::fmt;
 
@@ -18,9 +18,12 @@ pub const SIGNATURE_VERSION: u16 = 1;
 pub const CANONICALIZATION: &str = "jcs-rfc8785";
 pub const DEVICE_BINDING_REQUEST_DOMAIN: &str = "aeterna.device-binding.request.v1";
 pub const DEVICE_BINDING_APPROVAL_DOMAIN: &str = "aeterna.device-binding.approval.v1";
+pub const HEARTBEAT_SUBMIT_DOMAIN: &str = "aeterna.heartbeat.submit.v1";
+pub const DEVICE_STATUS_CHANGE_DOMAIN: &str = "aeterna.device-status.change.v1";
 pub const MAX_PROTOCOL_BODY_BYTES: usize = 16_384;
 pub const MAX_EMAIL_BYTES: usize = 254;
 pub const MAX_DEVICE_LABEL_BYTES: usize = 64;
+pub const MAX_HEARTBEAT_SEQUENCE: u64 = 9_007_199_254_740_991;
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -123,6 +126,42 @@ pub struct DeviceBindingConfirmationDocument {
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
+pub struct HeartbeatRequestDocument {
+    pub account_id: String,
+    pub canonicalization: String,
+    pub device_id: String,
+    pub domain: String,
+    pub operation: String,
+    pub protocol_version: u16,
+    pub request_id: String,
+    pub sequence: u64,
+    pub signature_version: u16,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DeviceStatusAction {
+    MarkLost,
+    Revoke,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct DeviceStatusChangeDocument {
+    pub account_id: String,
+    pub action: DeviceStatusAction,
+    pub authorizing_device_id: String,
+    pub canonicalization: String,
+    pub domain: String,
+    pub operation: String,
+    pub protocol_version: u16,
+    pub request_id: String,
+    pub signature_version: u16,
+    pub target_device_id: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct SignedEnvelope<T> {
     pub protocol_version: u16,
     pub signed: T,
@@ -151,6 +190,32 @@ pub struct DeviceBindingData {
     pub not_before: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub expires_at: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct HeartbeatData {
+    pub accepted_at: String,
+    pub accepted_sequence: u64,
+    pub account_id: String,
+    pub device_id: String,
+    pub next_heartbeat_not_before: String,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DeviceStatusChangeStatus {
+    Lost,
+    Revoked,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct DeviceStatusChangeData {
+    pub account_id: String,
+    pub changed_at: String,
+    pub device_id: String,
+    pub status: DeviceStatusChangeStatus,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -189,6 +254,7 @@ pub enum ProtocolError {
     InvalidEmail,
     InvalidPublicKey,
     InvalidRequestId,
+    InvalidSequence,
     InvalidSignature,
     InvalidUuid,
     UnsupportedCanonicalization,
@@ -208,6 +274,7 @@ impl ProtocolError {
             Self::InvalidEmail => "protocol.invalid_email",
             Self::InvalidPublicKey => "protocol.invalid_public_key",
             Self::InvalidRequestId => "protocol.invalid_request_id",
+            Self::InvalidSequence => "protocol.invalid_sequence",
             Self::InvalidSignature => "device.proof_invalid",
             Self::InvalidUuid => "protocol.invalid_uuid",
             Self::UnsupportedCanonicalization => "protocol.unsupported_version",
@@ -349,6 +416,38 @@ pub fn validate_binding_confirmation(
     Ok(())
 }
 
+pub fn validate_heartbeat(document: &HeartbeatRequestDocument) -> Result<(), ProtocolError> {
+    validate_signed_header(
+        SignedHeaderRef::from_heartbeat(document),
+        HEARTBEAT_SUBMIT_DOMAIN,
+        "heartbeat.submit",
+    )?;
+    validate_uuid(&document.account_id)?;
+    validate_uuid(&document.device_id)?;
+    if document.sequence == 0 || document.sequence > MAX_HEARTBEAT_SEQUENCE {
+        return Err(ProtocolError::InvalidSequence);
+    }
+    Ok(())
+}
+
+pub fn validate_device_status_change(
+    document: &DeviceStatusChangeDocument,
+) -> Result<(), ProtocolError> {
+    validate_signed_header(
+        SignedHeaderRef::from_device_status_change(document),
+        DEVICE_STATUS_CHANGE_DOMAIN,
+        "device_status.change",
+    )?;
+    for value in [
+        &document.account_id,
+        &document.authorizing_device_id,
+        &document.target_device_id,
+    ] {
+        validate_uuid(value)?;
+    }
+    Ok(())
+}
+
 struct SignedHeaderRef<'a> {
     protocol_version: u16,
     signature_version: u16,
@@ -382,6 +481,28 @@ impl<'a> SignedHeaderRef<'a> {
     }
 
     fn from_confirmation(document: &'a DeviceBindingConfirmationDocument) -> Self {
+        Self {
+            protocol_version: document.protocol_version,
+            signature_version: document.signature_version,
+            canonicalization: &document.canonicalization,
+            domain: &document.domain,
+            operation: &document.operation,
+            request_id: &document.request_id,
+        }
+    }
+
+    fn from_heartbeat(document: &'a HeartbeatRequestDocument) -> Self {
+        Self {
+            protocol_version: document.protocol_version,
+            signature_version: document.signature_version,
+            canonicalization: &document.canonicalization,
+            domain: &document.domain,
+            operation: &document.operation,
+            request_id: &document.request_id,
+        }
+    }
+
+    fn from_device_status_change(document: &'a DeviceStatusChangeDocument) -> Self {
         Self {
             protocol_version: document.protocol_version,
             signature_version: document.signature_version,
@@ -498,6 +619,37 @@ mod tests {
         fixture_version: u16,
         canonical_bytes: String,
         document: serde_json::Value,
+    }
+
+    #[derive(Deserialize)]
+    #[serde(deny_unknown_fields)]
+    struct HeartbeatSignatureFixture {
+        fixture_version: u16,
+        seed: String,
+        public_key: String,
+        canonical_bytes: String,
+        signature: String,
+        document: HeartbeatRequestDocument,
+    }
+
+    #[derive(Deserialize)]
+    #[serde(deny_unknown_fields)]
+    struct HeartbeatFailureFixture {
+        fixture_version: u16,
+        expected: String,
+        verification_public_key: String,
+        envelope: SignedEnvelope<HeartbeatRequestDocument>,
+    }
+
+    #[derive(Deserialize)]
+    #[serde(deny_unknown_fields)]
+    struct DeviceStatusSignatureFixture {
+        fixture_version: u16,
+        seed: String,
+        public_key: String,
+        canonical_bytes: String,
+        signature: String,
+        document: DeviceStatusChangeDocument,
     }
 
     #[test]
@@ -679,5 +831,107 @@ mod tests {
         assert_eq!(fixture.fixture_version, 1);
         let canonical = canonical_bytes(&fixture.document).expect("JCS should succeed");
         assert_eq!(URL_SAFE_NO_PAD.encode(canonical), fixture.canonical_bytes);
+    }
+
+    #[test]
+    fn heartbeat_fixture_matches_and_forbidden_fields_fail_closed() {
+        let fixture: HeartbeatSignatureFixture = serde_json::from_str(include_str!(
+            "../../protocol/v1/fixtures/signatures/heartbeat-request.json"
+        ))
+        .expect("heartbeat signature fixture should parse");
+        assert_eq!(fixture.fixture_version, 1);
+        assert_eq!(validate_heartbeat(&fixture.document), Ok(()));
+        let seed = decode_exact::<32>(&fixture.seed).expect("seed should parse");
+        let public = decode_public_key(&fixture.public_key).expect("public key should parse");
+        assert_eq!(
+            URL_SAFE_NO_PAD
+                .encode(canonical_bytes(&fixture.document).expect("heartbeat JCS should succeed")),
+            fixture.canonical_bytes
+        );
+        assert_eq!(
+            sign_document(&SigningSecret::from_storage_bytes(seed), &fixture.document),
+            Ok(fixture.signature.clone())
+        );
+        assert_eq!(
+            verify_document(&public, &fixture.document, &fixture.signature),
+            Ok(())
+        );
+
+        assert!(
+            serde_json::from_str::<SignedEnvelope<HeartbeatRequestDocument>>(include_str!(
+                "../../protocol/v1/fixtures/invalid/heartbeat-request-forbidden-data.json"
+            ))
+            .is_err()
+        );
+        let mut invalid = fixture.document.clone();
+        invalid.sequence = 0;
+        assert_eq!(
+            validate_heartbeat(&invalid),
+            Err(ProtocolError::InvalidSequence)
+        );
+        invalid.sequence = MAX_HEARTBEAT_SEQUENCE + 1;
+        assert_eq!(
+            validate_heartbeat(&invalid),
+            Err(ProtocolError::InvalidSequence)
+        );
+    }
+
+    #[test]
+    fn heartbeat_mutation_and_cross_domain_replay_fail_signature_verification() {
+        for fixture_text in [
+            include_str!("../../protocol/v1/fixtures/signatures/heartbeat-modified-payload.json"),
+            include_str!(
+                "../../protocol/v1/fixtures/signatures/heartbeat-cross-domain-replay.json"
+            ),
+        ] {
+            let fixture: HeartbeatFailureFixture =
+                serde_json::from_str(fixture_text).expect("failure fixture should parse");
+            assert_eq!(fixture.fixture_version, 1);
+            assert_eq!(fixture.expected, "device.proof_invalid");
+            let public = decode_public_key(&fixture.verification_public_key)
+                .expect("verification key should parse");
+            assert_eq!(
+                verify_document(
+                    &public,
+                    &fixture.envelope.signed,
+                    &fixture.envelope.signature,
+                ),
+                Err(ProtocolError::InvalidSignature)
+            );
+        }
+    }
+
+    #[test]
+    fn device_status_fixture_uses_its_own_domain() {
+        let fixture: DeviceStatusSignatureFixture = serde_json::from_str(include_str!(
+            "../../protocol/v1/fixtures/signatures/device-status-change.json"
+        ))
+        .expect("device status fixture should parse");
+        assert_eq!(fixture.fixture_version, 1);
+        assert_eq!(validate_device_status_change(&fixture.document), Ok(()));
+        let seed = decode_exact::<32>(&fixture.seed).expect("seed should parse");
+        let public = decode_public_key(&fixture.public_key).expect("public key should parse");
+        assert_eq!(
+            URL_SAFE_NO_PAD.encode(
+                canonical_bytes(&fixture.document).expect("device status JCS should succeed")
+            ),
+            fixture.canonical_bytes
+        );
+        assert_eq!(
+            sign_document(&SigningSecret::from_storage_bytes(seed), &fixture.document),
+            Ok(fixture.signature.clone())
+        );
+        assert_eq!(
+            verify_document(&public, &fixture.document, &fixture.signature),
+            Ok(())
+        );
+        let heartbeat: HeartbeatSignatureFixture = serde_json::from_str(include_str!(
+            "../../protocol/v1/fixtures/signatures/heartbeat-request.json"
+        ))
+        .expect("heartbeat fixture should parse");
+        assert_eq!(
+            verify_document(&public, &fixture.document, &heartbeat.signature),
+            Err(ProtocolError::InvalidSignature)
+        );
     }
 }

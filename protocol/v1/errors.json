@@ -18,6 +18,12 @@
     { "code": "device.binding_cancelled", "http_status": 409 },
     { "code": "device.approver_not_active", "http_status": 403 },
     { "code": "device.limit_reached", "http_status": 409 },
+    { "code": "device.not_active", "http_status": 403 },
+    { "code": "device.reverification_required", "http_status": 403 },
+    { "code": "device.status_terminal", "http_status": 409 },
+    { "code": "device.target_not_found", "http_status": 404 },
+    { "code": "heartbeat.sequence_not_increasing", "http_status": 409 },
+    { "code": "heartbeat.cooldown", "http_status": 429 },
     { "code": "request.idempotency_conflict", "http_status": 409 },
     { "code": "service.temporarily_unavailable", "http_status": 503 }
   ]

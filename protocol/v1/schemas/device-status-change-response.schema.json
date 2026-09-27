@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:aeterna:protocol:v1:device-status-change-response",
+  "additionalProperties": false,
+  "properties": {
+    "data": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": { "$ref": "common.schema.json#/$defs/uuid" },
+        "changed_at": { "$ref": "common.schema.json#/$defs/timestamp" },
+        "device_id": { "$ref": "common.schema.json#/$defs/uuid" },
+        "status": { "enum": ["lost", "revoked"], "type": "string" }
+      },
+      "required": ["account_id", "changed_at", "device_id", "status"],
+      "type": "object"
+    },
+    "protocol_version": { "$ref": "common.schema.json#/$defs/protocolVersion" },
+    "request_id": { "$ref": "common.schema.json#/$defs/uuid" }
+  },
+  "required": ["protocol_version", "request_id", "data"],
+  "type": "object"
+}

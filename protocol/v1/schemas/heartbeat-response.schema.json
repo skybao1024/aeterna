@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:aeterna:protocol:v1:heartbeat-response",
+  "additionalProperties": false,
+  "properties": {
+    "data": {
+      "additionalProperties": false,
+      "properties": {
+        "accepted_at": { "$ref": "common.schema.json#/$defs/timestamp" },
+        "accepted_sequence": {
+          "$ref": "common.schema.json#/$defs/heartbeatSequence"
+        },
+        "account_id": { "$ref": "common.schema.json#/$defs/uuid" },
+        "device_id": { "$ref": "common.schema.json#/$defs/uuid" },
+        "next_heartbeat_not_before": {
+          "$ref": "common.schema.json#/$defs/timestamp"
+        }
+      },
+      "required": [
+        "accepted_at",
+        "accepted_sequence",
+        "account_id",
+        "device_id",
+        "next_heartbeat_not_before"
+      ],
+      "type": "object"
+    },
+    "protocol_version": { "$ref": "common.schema.json#/$defs/protocolVersion" },
+    "request_id": { "$ref": "common.schema.json#/$defs/uuid" }
+  },
+  "required": ["protocol_version", "request_id", "data"],
+  "type": "object"
+}
