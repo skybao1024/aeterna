@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:aeterna:protocol:v1:device-binding-response",
+  "additionalProperties": false,
+  "properties": {
+    "protocol_version": { "$ref": "common.schema.json#/$defs/protocolVersion" },
+    "request_id": { "$ref": "common.schema.json#/$defs/uuid" },
+    "data": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": { "$ref": "common.schema.json#/$defs/uuid" },
+        "binding_id": { "$ref": "common.schema.json#/$defs/uuid" },
+        "device_id": { "$ref": "common.schema.json#/$defs/uuid" },
+        "state": { "$ref": "common.schema.json#/$defs/bindingState" },
+        "challenge": { "$ref": "common.schema.json#/$defs/base64url32" },
+        "not_before": { "$ref": "common.schema.json#/$defs/timestamp" },
+        "expires_at": { "$ref": "common.schema.json#/$defs/timestamp" }
+      },
+      "required": ["account_id", "binding_id", "device_id", "state"],
+      "type": "object"
+    }
+  },
+  "required": ["protocol_version", "request_id", "data"],
+  "type": "object"
+}

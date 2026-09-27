@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:aeterna:protocol:v1:account-challenge-verification-response",
+  "additionalProperties": false,
+  "properties": {
+    "protocol_version": { "$ref": "common.schema.json#/$defs/protocolVersion" },
+    "request_id": { "$ref": "common.schema.json#/$defs/uuid" },
+    "data": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": { "$ref": "common.schema.json#/$defs/uuid" },
+        "binding_grant_id": { "$ref": "common.schema.json#/$defs/uuid" },
+        "binding_grant_token": {
+          "$ref": "common.schema.json#/$defs/base64url32"
+        },
+        "expires_at": { "$ref": "common.schema.json#/$defs/timestamp" },
+        "purpose": { "$ref": "common.schema.json#/$defs/challengePurpose" },
+        "binding_id": { "$ref": "common.schema.json#/$defs/uuid" }
+      },
+      "required": [
+        "account_id",
+        "binding_grant_id",
+        "binding_grant_token",
+        "expires_at",
+        "purpose"
+      ],
+      "type": "object"
+    }
+  },
+  "required": ["protocol_version", "request_id", "data"],
+  "type": "object"
+}

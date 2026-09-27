@@ -55,7 +55,9 @@ review, not a disguised production implementation.
 
 ## 4. Milestones and iterations
 
-Status values are `Pending`, `In Progress`, `Blocked`, and `Accepted`.
+Status values are `Pending`, `In Progress`, `Blocked`, `Stopped`, and `Accepted`.
+`Stopped` means work ended without satisfying acceptance criteria; it does not
+waive those criteria or unblock a dependent gate.
 
 | ID  | Iteration                                            | Repository | Depends on                                          | Exit evidence                                                                        | Status  |
 | --- | ---------------------------------------------------- | ---------- | --------------------------------------------------- | ------------------------------------------------------------------------------------ | ------- |
@@ -68,17 +70,17 @@ Status values are `Pending`, `In Progress`, `Blocked`, and `Accepted`.
 | I05 | Versioned vault format and encrypted storage core    | Client     | G0                                                  | Local encrypted records survive restart and tampering is rejected                    | Accepted |
 | I06 | Vault item and bounded-attachment MVP                | Client     | I05                                                 | User can create, edit, read, and delete encrypted local content                      | Accepted |
 | I07 | Atomic encrypted export and import                   | Client     | I05-I06                                             | Interruption and tampering tests pass; restored vault matches source                 | Accepted |
-| I08 | macOS lifecycle, activity agent, and hardening       | Client     | G0, I01, I05-I07                                    | macOS autostart, tray health, CSP, capabilities, and i18n acceptance pass            | Pending |
+| I08 | macOS lifecycle, activity agent, and hardening       | Client     | G0, I01, I05-I07                                    | macOS autostart, tray health, CSP, capabilities, and i18n acceptance pass            | Stopped |
 | GW  | Windows platform qualification gate                 | Client     | I04; application core available for Windows testing | Real-Windows matrices pass; ADR 0003 approved or redesigned; no unqualified release  | Pending |
-| I09 | Public protocol v1 and account/device binding        | Both       | G0                                                  | Versioned schemas and fixtures drive client and server contract tests                | Pending |
+| I09 | Public protocol v1 and account/device binding        | Both       | G0                                                  | Versioned schemas and fixtures drive client and server contract tests                | Accepted |
 | I10 | Signed heartbeat and multi-device aggregation        | Both       | I09                                                 | Replay, revocation, stale-device, and concurrent-device tests pass                   | Pending |
 | I11 | Warning/grace state machine and transactional outbox | Server     | I03, I10                                            | Time, outage, concurrency, idempotency, and rollback tests pass                      | Pending |
-| I12 | Contacts, consent, and email notification delivery   | Server     | I11                                                 | Verification, opt-out, retry, redaction, and provider-failure tests pass             | Pending |
-| I13 | Delayed recovery material and claim protocol         | Both       | I02, I09, I11-I12; KMS design approved              | Pre-release denial and post-release recovery tests pass end to end                   | Pending |
+| I12 | Contacts, consent, and email notification delivery   | Server     | I11                                                 | Both disclosure modes, verification gates, retry, redaction, and failure tests pass  | Pending |
+| I13 | Delayed recovery material and claim protocol         | Both       | I02, I09, I11-I12; KMS design approved              | Unverified/pre-release claims fail; post-release recovery passes end to end           | Pending |
 | I14 | Owner recovery, ERC rotation, and post-release rekey | Both       | I13                                                 | Cooldown, cancellation, rotation, and re-encryption tests pass                       | Pending |
 | G1  | macOS v1 security and recovery-readiness gate        | Both       | I05-I14                                             | Independent crypto review, macOS penetration test, and recovery drill pass           | Pending |
 | I15 | macOS release operations and resilience              | Both       | G1                                                  | Signed artifacts, update path, backup restore, shutdown migration, and runbooks pass | Pending |
-| I16 | Optional commercial extensions                       | Server     | Stable v1 core                                      | Billing and SMS cannot compromise base email or recovery guarantees                  | Pending |
+| I16 | Optional commercial billing extensions               | Server     | Stable v1 core                                      | Billing cannot compromise base email or recovery guarantees                          | Pending |
 
 ## 5. Detailed iteration scope
 
@@ -242,6 +244,14 @@ gates rather than I07 acceptance substitutes.
 
 ### I08 — macOS lifecycle, activity agent, and hardening
 
+Work stopped without acceptance on 2026-09-27. The implementation and result
+record are preserved at commit `090912f` on `codex/i08-stopped-checkpoint`, with
+macOS lifecycle ADR 0011. The current-host Keychain gate passed its signed
+startup check, but the remaining native matrices and macOS 15 floor evidence
+are incomplete. The exact synthetic Keychain gate also remains after its narrow
+delete probe failed. I09 depends on G0 and may proceed independently; I08 must
+still be accepted before G1.
+
 Turn the accepted macOS prototypes into production components. Add autostart,
 bounded heartbeat scheduling inputs, last-success health state, tray warning,
 local notification, strict CSP, window-specific Tauri capabilities, and
@@ -288,10 +298,22 @@ minimum grace period when prior owner warning cannot be proven.
 
 ### I12 — Contacts, consent, and email notification delivery
 
-Add encrypted contact fields and constrained plaintext notification templates,
-contact consent/verification, test delivery, opt-out, bounce visibility,
-provider adapters, retry policy, and redacted delivery audit. Base email and
-configured recovery notification must not depend on a paid entitlement.
+Implement the two v1 disclosure modes without making the user design a delivery
+workflow. Confirm-now sends a neutral setup invitation and promotes the record
+from Notification Target to Recovery Contact only after explicit acceptance and
+email verification. Private-until-release sends nothing before `RELEASED`,
+shows Owner that delivery is unverified and best-effort, and permits only a
+fixed neutral invitation after release; custom content and recovery claims stay
+blocked until acceptance and verification.
+
+Add encrypted email fields, constrained plaintext notification templates,
+accept/decline and deletion handling, confirmed-contact test delivery, bounce
+visibility, retry policy, abuse limits, stable idempotency, and redacted
+delivery audit. Complete provider-policy and jurisdiction review for the
+one-time release invitation to a previously unverified private target. All
+automated remote notifications in v1 use email. v1 stores no contact phone
+number and has no SMS provider, quota, configuration, or fallback. Base email
+and configured recovery notification must not depend on a paid entitlement.
 
 ### I13 — Delayed recovery material and claim protocol
 
@@ -299,7 +321,9 @@ After KMS and crypto review, add per-device SRS envelope encryption, release
 authorization, short-lived claim links, contact OTP, scoped claim tokens,
 single-purpose API operations, retrieval audit, and owner/other-contact alerts.
 Prove that ERC without SRS and SRS without ERC plus a local vault are useless,
-and that every pre-release retrieval path is rejected.
+that every pre-release retrieval path is rejected, and that a private
+Notification Target cannot obtain a claim before release-time acceptance and
+email verification promote it to Recovery Contact.
 
 ### I14 — Owner recovery, ERC rotation, and post-release rekey
 
@@ -322,11 +346,14 @@ separation, monitoring without sensitive payloads, disaster recovery, retention
 jobs, operator runbooks, and the service-shutdown migration that converts delayed
 recovery into an owner-authorized offline recovery path.
 
-### I16 — Optional commercial extensions
+### I16 — Optional commercial billing extensions
 
-Only after the base system is stable, add SMS and billing behind isolated
-adapters and verified webhooks. Expiration, quota exhaustion, or provider failure
-must never silently disable base email warning or already configured recovery.
+Only after the base system is stable, add billing behind isolated entitlement
+checks and verified webhooks. Expiration, payment failure, or provider failure
+must never silently disable base email warning, an accepted invitation, or an
+already configured recovery. SMS is not part of v1 or I16; any future remote
+channel requires a separate approved ADR, privacy/provider review, and a newly
+scheduled iteration.
 
 ## 6. Verification ownership
 
@@ -381,3 +408,4 @@ evidence.
 - 2026-09-21: I05 accepted in task `01a0c37c-83e4-7b70-a0e2-7d5a760b77e7`. The exact SQLite dependency and v1 format proposal were approved before implementation. The Rust-owned repository passed 65 Rust unit tests, 9 real-file I05 integration tests, interruption, concurrency, tamper, nonce, recovery, and main/WAL/SHM/journal/staging/backup privacy evidence; pinned-toolchain `npm run check` and the unsigned desktop build passed. ADR 0007 is Accepted. Cross-copy nonce uniqueness remains probabilistic at the 96-bit CSPRNG boundary, and the known non-fatal `rust-objcopy` warning remains. I06 is next eligible but was not started.
 - 2026-09-22: I06 accepted in task `01a0c444-7650-7c91-a70b-a5a4b6edb485`. The exact item payload, 786,432-byte aggregate attachment cap, recovery-less development onboarding, fixed app-local path, Rust session state, fourteen-command JSON/raw IPC boundary, and capability allowlist were approved before implementation in ADR 0008. Focused checks passed 7 item, 4 IPC, 5 real-file I06, and 14 frontend tests; pinned-toolchain `npm run check` passed 72 Rust unit, 9 I05 integration, and 5 I06 integration tests plus all format/lint/type/build checks. The unsigned desktop build passed with the known non-fatal `rust-objcopy` warning, and the native macOS setup screen was inspected in both locales without creating persistent unrecoverable test data. I07 is next eligible but was not started.
 - 2026-09-22: I07 accepted after explicit approval of ADR 0009 and the corrected 15-byte `create_vault_v1` identifier. The exact package, two-copy restore, nonce, privacy, fixed-seed mutation, native AppKit, deterministic short-write/`ENOSPC`/quota/syscall failure, 41-state subprocess crash, authenticated 24-hour cleanup, permission/special-file, destination-parent swap, and exact 1,073,741,824-byte package evidence passed. The heavy maximum fixture authenticated and decrypted 1,156 valid records in 568.33 seconds and rejected limit plus one. Final pinned-toolchain `npm run check` passed 20 frontend tests, 85 non-ignored Rust unit tests, 9 I05 integration tests, and 5 I06 integration tests; the sole ignored unit is that separately executed 1-GiB fixture. The unsigned desktop build passed with the known non-fatal `rust-objcopy` warning. I08 is next eligible but was not started.
+- 2026-09-27: I09 accepted after explicit approval of ADR 0012 and the complete proposal boundary. The public protocol v1 schemas, strict transport rules, JCS/Ed25519 signing contract, stable errors, and synthetic success and failure fixtures are bound by release digest `a2d4fe59198267d3a246e278c6a0ab196c5f6660ed48b9f1dd276fb22af447fd` and drive both Rust and private-service contract tests. The client `npm run check` passed 20 frontend tests and 94 non-ignored Rust tests; the unsigned desktop build passed with the known non-fatal `rust-objcopy` warning. The private service passed 50 Dockerized tests, PostgreSQL migration upgrade/downgrade/upgrade, focused Black/isort, and critical Flake8 checks. ADR 0012 is Accepted. Production key access remains fail-closed until an approved KMS/HSM provider is configured; the prepared `protocol-v1.0.0` tag was not created or published. I10 is next eligible.

@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:aeterna:protocol:v1:account-challenge-request",
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "purpose": {
+            "enum": [
+              "device_binding_cancellation",
+              "device_binding_delayed_confirmation"
+            ]
+          }
+        },
+        "required": ["purpose"]
+      },
+      "then": { "required": ["binding_id"] },
+      "else": { "not": { "required": ["binding_id"] } }
+    }
+  ],
+  "properties": {
+    "protocol_version": { "$ref": "common.schema.json#/$defs/protocolVersion" },
+    "request_id": { "$ref": "common.schema.json#/$defs/uuid" },
+    "email": { "$ref": "common.schema.json#/$defs/email" },
+    "purpose": { "$ref": "common.schema.json#/$defs/challengePurpose" },
+    "binding_id": { "$ref": "common.schema.json#/$defs/uuid" }
+  },
+  "required": ["protocol_version", "request_id", "email", "purpose"],
+  "type": "object"
+}

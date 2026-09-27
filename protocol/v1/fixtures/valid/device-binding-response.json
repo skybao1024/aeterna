@@ -1,0 +1,13 @@
+{
+  "protocol_version": 1,
+  "request_id": "00000000-0000-4000-8000-000000000001",
+  "data": {
+    "account_id": "00000000-0000-4000-8000-000000000020",
+    "binding_id": "00000000-0000-4000-8000-000000000021",
+    "device_id": "00000000-0000-4000-8000-000000000003",
+    "state": "pending",
+    "challenge": "IiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiI",
+    "not_before": "2026-09-28T00:00:00Z",
+    "expires_at": "2026-10-04T00:00:00Z"
+  }
+}

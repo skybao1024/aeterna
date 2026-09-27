@@ -1,0 +1,16 @@
+{
+  "protocol_version": 1,
+  "signed": {
+    "binding_grant_id": "00000000-0000-4000-8000-000000000002",
+    "canonicalization": "jcs-rfc8785",
+    "device_id": "00000000-0000-4000-8000-000000000003",
+    "device_label": "Synthetic Mac",
+    "domain": "aeterna.device-binding.request.v1",
+    "operation": "device_binding.request",
+    "protocol_version": 1,
+    "public_key": "0EqyMnQrtKs6E2i9RhXk5tAiSrcaAWuvhSCjMsl3hzc",
+    "request_id": "00000000-0000-4000-8000-000000000001",
+    "signature_version": 1
+  },
+  "signature": "D4WJt0WW3pfOV-kXh0uYboDe4sUwG0uhchsbAHcupnMoqiDfYfpyocgvoct85Eh13lFAsyBsobrvlu6WHpdnAg"
+}

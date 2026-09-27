@@ -1,0 +1,11 @@
+{
+  "fixture_version": 1,
+  "canonical_bytes": "eyJhIjoiYWxwaGEiLCJ6IjoibGluZVxucXVvdGVcInNsYXNoXFwiLCLDqSI6Ik5GQyIsIuKCrCI6ImV1cm8iLCLwn5iAIjoiYXN0cmFsIn0",
+  "document": {
+    "😀": "astral",
+    "z": "line\nquote\"slash\\",
+    "é": "NFC",
+    "a": "alpha",
+    "€": "euro"
+  }
+}

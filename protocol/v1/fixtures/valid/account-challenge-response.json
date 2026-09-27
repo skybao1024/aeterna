@@ -1,0 +1,9 @@
+{
+  "protocol_version": 1,
+  "request_id": "00000000-0000-4000-8000-000000000010",
+  "data": {
+    "challenge_id": "00000000-0000-4000-8000-000000000011",
+    "expires_in_seconds": 600,
+    "resend_after_seconds": 60
+  }
+}

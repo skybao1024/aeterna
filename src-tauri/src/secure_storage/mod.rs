@@ -11,7 +11,7 @@ mod macos;
 #[cfg(target_os = "windows")]
 mod windows;
 
-pub const KEYCHAIN_SERVICE: &str = "dev.aeterna.desktop.i02.device-signing";
+pub const KEYCHAIN_SERVICE: &str = "app.aeterna.device-signing.v1";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum DeleteOutcome {

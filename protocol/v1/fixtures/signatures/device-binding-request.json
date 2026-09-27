@@ -1,0 +1,19 @@
+{
+  "fixture_version": 1,
+  "seed": "ERERERERERERERERERERERERERERERERERERERERERE",
+  "public_key": "0EqyMnQrtKs6E2i9RhXk5tAiSrcaAWuvhSCjMsl3hzc",
+  "canonical_bytes": "eyJiaW5kaW5nX2dyYW50X2lkIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDAyIiwiY2Fub25pY2FsaXphdGlvbiI6Impjcy1yZmM4Nzg1IiwiZGV2aWNlX2lkIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDAzIiwiZGV2aWNlX2xhYmVsIjoiU3ludGhldGljIE1hYyIsImRvbWFpbiI6ImFldGVybmEuZGV2aWNlLWJpbmRpbmcucmVxdWVzdC52MSIsIm9wZXJhdGlvbiI6ImRldmljZV9iaW5kaW5nLnJlcXVlc3QiLCJwcm90b2NvbF92ZXJzaW9uIjoxLCJwdWJsaWNfa2V5IjoiMEVxeU1uUXJ0S3M2RTJpOVJoWGs1dEFpU3JjYUFXdXZoU0NqTXNsM2h6YyIsInJlcXVlc3RfaWQiOiIwMDAwMDAwMC0wMDAwLTQwMDAtODAwMC0wMDAwMDAwMDAwMDEiLCJzaWduYXR1cmVfdmVyc2lvbiI6MX0",
+  "signature": "D4WJt0WW3pfOV-kXh0uYboDe4sUwG0uhchsbAHcupnMoqiDfYfpyocgvoct85Eh13lFAsyBsobrvlu6WHpdnAg",
+  "document": {
+    "binding_grant_id": "00000000-0000-4000-8000-000000000002",
+    "canonicalization": "jcs-rfc8785",
+    "device_id": "00000000-0000-4000-8000-000000000003",
+    "device_label": "Synthetic Mac",
+    "domain": "aeterna.device-binding.request.v1",
+    "operation": "device_binding.request",
+    "protocol_version": 1,
+    "public_key": "0EqyMnQrtKs6E2i9RhXk5tAiSrcaAWuvhSCjMsl3hzc",
+    "request_id": "00000000-0000-4000-8000-000000000001",
+    "signature_version": 1
+  }
+}

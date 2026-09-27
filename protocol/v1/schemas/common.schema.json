@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:aeterna:protocol:v1:common",
+  "$defs": {
+    "protocolVersion": { "const": 1, "type": "integer" },
+    "signatureVersion": { "const": 1, "type": "integer" },
+    "canonicalization": { "const": "jcs-rfc8785", "type": "string" },
+    "uuid": {
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "type": "string"
+    },
+    "timestamp": {
+      "format": "date-time",
+      "pattern": "Z$",
+      "type": "string"
+    },
+    "base64url32": {
+      "maxLength": 43,
+      "minLength": 43,
+      "pattern": "^[A-Za-z0-9_-]{43}$",
+      "type": "string"
+    },
+    "base64url64": {
+      "maxLength": 86,
+      "minLength": 86,
+      "pattern": "^[A-Za-z0-9_-]{86}$",
+      "type": "string"
+    },
+    "email": {
+      "format": "email",
+      "maxLength": 254,
+      "minLength": 3,
+      "type": "string",
+      "x-aeterna-max-utf8-bytes": 254,
+      "x-aeterna-normalization": "email-validator-normalized"
+    },
+    "deviceLabel": {
+      "maxLength": 64,
+      "minLength": 1,
+      "type": "string",
+      "x-aeterna-forbid-control-characters": true,
+      "x-aeterna-max-utf8-bytes": 64,
+      "x-aeterna-normalization": "NFC"
+    },
+    "challengePurpose": {
+      "enum": [
+        "account_onboarding",
+        "device_binding",
+        "device_binding_cancellation",
+        "device_binding_delayed_confirmation"
+      ],
+      "type": "string"
+    },
+    "bindingState": {
+      "enum": ["active", "pending", "cancelled", "expired"],
+      "type": "string"
+    }
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:aeterna:protocol:v1:device-binding-approval-request",
+  "additionalProperties": false,
+  "properties": {
+    "protocol_version": { "$ref": "common.schema.json#/$defs/protocolVersion" },
+    "signed": {
+      "additionalProperties": false,
+      "properties": {
+        "canonicalization": {
+          "$ref": "common.schema.json#/$defs/canonicalization"
+        },
+        "domain": {
+          "const": "aeterna.device-binding.approval.v1",
+          "type": "string"
+        },
+        "operation": { "const": "device_binding.approval", "type": "string" },
+        "protocol_version": {
+          "$ref": "common.schema.json#/$defs/protocolVersion"
+        },
+        "signature_version": {
+          "$ref": "common.schema.json#/$defs/signatureVersion"
+        },
+        "request_id": { "$ref": "common.schema.json#/$defs/uuid" },
+        "account_id": { "$ref": "common.schema.json#/$defs/uuid" },
+        "binding_id": { "$ref": "common.schema.json#/$defs/uuid" },
+        "approving_device_id": { "$ref": "common.schema.json#/$defs/uuid" },
+        "device_id": { "$ref": "common.schema.json#/$defs/uuid" },
+        "public_key": { "$ref": "common.schema.json#/$defs/base64url32" },
+        "challenge": { "$ref": "common.schema.json#/$defs/base64url32" }
+      },
+      "required": [
+        "canonicalization",
+        "domain",
+        "operation",
+        "protocol_version",
+        "signature_version",
+        "request_id",
+        "account_id",
+        "binding_id",
+        "approving_device_id",
+        "device_id",
+        "public_key",
+        "challenge"
+      ],
+      "type": "object"
+    },
+    "signature": { "$ref": "common.schema.json#/$defs/base64url64" }
+  },
+  "required": ["protocol_version", "signed", "signature"],
+  "type": "object"
+}

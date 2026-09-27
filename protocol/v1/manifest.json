@@ -1,0 +1,125 @@
+{
+  "manifest_version": 1,
+  "protocol_version": 1,
+  "release": "1.0.0",
+  "release_tag": "protocol-v1.0.0",
+  "files": [
+    {
+      "path": "errors.json",
+      "sha256": "3f7e319c491da79e4e9f875ccbfc020c2cbd22300308cabcd9735355fa0299ad"
+    },
+    {
+      "path": "fixtures/invalid/account-challenge-duplicate-member.json",
+      "sha256": "30af1d111c070def83d8e94c1731873cca048f7ffdcce1ba2feb7e2fc69c22bd"
+    },
+    {
+      "path": "fixtures/invalid/device-binding-request-extra-field.json",
+      "sha256": "24b27329f420ed52ccf074d25e64c80f7c9ad23a70349160f7b9fc85e1ce9443"
+    },
+    {
+      "path": "fixtures/invalid/device-binding-request-forbidden-data.json",
+      "sha256": "206cc9137ca0b4c1e72e174d2067283386f07f31567e4d774e36f37190b751ec"
+    },
+    {
+      "path": "fixtures/invalid/device-binding-request-signature-padding.json",
+      "sha256": "d16cafb70707582730d4e7231bfe5d2c045b1a9afe4b77326ee90f1973353ed4"
+    },
+    {
+      "path": "fixtures/signatures/device-binding-approval.json",
+      "sha256": "5a5cbc629f28b1cc0f311ff954fcc0e7a46ffb87afd800570f250f397885c47f"
+    },
+    {
+      "path": "fixtures/signatures/device-binding-cross-domain-replay.json",
+      "sha256": "d84353bef7cc642ca9797f9e780d6e82722f24974ba037099cbd1df3d6aa25fa"
+    },
+    {
+      "path": "fixtures/signatures/device-binding-request-modified-signature.json",
+      "sha256": "bfa28e982930a8564b1f7cf4d2e9447e458a17b6b41fb8cb7090eaacdd9bfc99"
+    },
+    {
+      "path": "fixtures/signatures/device-binding-request-wrong-key.json",
+      "sha256": "f34245b6efd8b9cd378eed08444e6f328acd60a9e8d48a3ec5c0f39a04b15a0c"
+    },
+    {
+      "path": "fixtures/signatures/device-binding-request.json",
+      "sha256": "384f0b6ebf214e8295a20e793766e76bc0953943ea520d10b83e531e7162d6fd"
+    },
+    {
+      "path": "fixtures/signatures/jcs-unicode-and-escaping.json",
+      "sha256": "3aa9f050426b39e7efcfc86fdb3a15db30e018202d3a8f723abc178c52a7348e"
+    },
+    {
+      "path": "fixtures/valid/account-challenge-request.json",
+      "sha256": "05743a26b8a7401e4ed28b37e1aa87d3cc0b9bb532357961f848489e5e7eb6e4"
+    },
+    {
+      "path": "fixtures/valid/account-challenge-response.json",
+      "sha256": "ac3f562cd7c3fbc2a9ee1b5f3507b99726660f3dac10ca10ac4a3a56d345ae6e"
+    },
+    {
+      "path": "fixtures/valid/account-challenge-verification-request.json",
+      "sha256": "7c0e73d005268337e02b2bde9f26663fecec627a4eed1beddcb31ff0514812a2"
+    },
+    {
+      "path": "fixtures/valid/device-binding-approval-request.json",
+      "sha256": "74f245194220d3d676c11cda6abf196819eabc351a2a494b57bab3ef76ad7b64"
+    },
+    {
+      "path": "fixtures/valid/device-binding-request.json",
+      "sha256": "c48e1e43b64701e72762b9fa84da74d99a5413409a67f0c292b612c7a21156b2"
+    },
+    {
+      "path": "fixtures/valid/device-binding-response.json",
+      "sha256": "1171e64ae344f8031d64defb7091ce8a069957bed990e65091dee8ad1c1b4c3a"
+    },
+    {
+      "path": "README.md",
+      "sha256": "b6be57760e2f097e9f4b386dba3f370b78c14faa836625d7e2e010e7ddb955f9"
+    },
+    {
+      "path": "schemas/account-challenge-request.schema.json",
+      "sha256": "2b065b2c4c71616b396e6b116c9703f1cc7bb1359d5884383ef5d8b9a32a2354"
+    },
+    {
+      "path": "schemas/account-challenge-response.schema.json",
+      "sha256": "2e0b643ce300f640be76f8f3bee7fc6f5774db0add0e4da2393a5263852f9c54"
+    },
+    {
+      "path": "schemas/account-challenge-verification-request.schema.json",
+      "sha256": "55b5dfade6b6211ca56c089b313f9afb306378d9d4b3bf936717a274d04503ec"
+    },
+    {
+      "path": "schemas/account-challenge-verification-response.schema.json",
+      "sha256": "405e7e848c379fb1580d12e12187e14983c1953ff58c93bde6fac5f7759f4d6e"
+    },
+    {
+      "path": "schemas/common.schema.json",
+      "sha256": "2f793e51360f485051acf65283a101dc2998ffe3efb583bf4d5a06d8b07b5d69"
+    },
+    {
+      "path": "schemas/device-binding-approval-request.schema.json",
+      "sha256": "8de9b58e8c8cf894eb23e45bf855a3eea3df7033e9756297babdbf14e3afd78d"
+    },
+    {
+      "path": "schemas/device-binding-cancellation-request.schema.json",
+      "sha256": "450f4d96adc84f74df746cca478ef2282e859ccbeca692dad58f056fb8736537"
+    },
+    {
+      "path": "schemas/device-binding-delayed-confirmation-request.schema.json",
+      "sha256": "f68bc37879c4b97f1b40f4718df63376b9f6b53662918d1ba3bbd8adef996db5"
+    },
+    {
+      "path": "schemas/device-binding-request.schema.json",
+      "sha256": "c626e575be9ef7d6a102f74ff930739e032659d55428727bd44817157dbb4b5f"
+    },
+    {
+      "path": "schemas/device-binding-response.schema.json",
+      "sha256": "656b2046d8ee5d36c39fc3ad570fc712af704dcfb3c4c906be37a58dd27d41bd"
+    },
+    {
+      "path": "schemas/error-response.schema.json",
+      "sha256": "ddb4e2d722a63e1283a5135bc6f0ea7902e2e9bc37d6e51506ac85fcaa740ad0"
+    }
+  ],
+  "release_digest": "a2d4fe59198267d3a246e278c6a0ab196c5f6660ed48b9f1dd276fb22af447fd"
+}

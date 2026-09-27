@@ -3,6 +3,7 @@ pub mod crypto;
 #[cfg(target_os = "macos")]
 mod file_panel;
 mod ipc;
+pub mod protocol;
 pub mod secure_storage;
 pub mod vault;
 #[cfg(target_os = "windows")]

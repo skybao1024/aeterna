@@ -1,0 +1,24 @@
+{
+  "protocol_version": 1,
+  "errors": [
+    { "code": "protocol.invalid_json", "http_status": 400 },
+    { "code": "protocol.invalid_request", "http_status": 400 },
+    { "code": "protocol.unsupported_version", "http_status": 400 },
+    { "code": "protocol.unsupported_media_type", "http_status": 415 },
+    { "code": "protocol.payload_too_large", "http_status": 413 },
+    { "code": "auth.challenge_invalid", "http_status": 400 },
+    { "code": "auth.challenge_expired", "http_status": 400 },
+    { "code": "auth.attempts_exhausted", "http_status": 429 },
+    { "code": "auth.rate_limited", "http_status": 429 },
+    { "code": "auth.binding_grant_invalid", "http_status": 401 },
+    { "code": "device.proof_invalid", "http_status": 401 },
+    { "code": "device.binding_not_found", "http_status": 404 },
+    { "code": "device.binding_not_ready", "http_status": 409 },
+    { "code": "device.binding_expired", "http_status": 409 },
+    { "code": "device.binding_cancelled", "http_status": 409 },
+    { "code": "device.approver_not_active", "http_status": 403 },
+    { "code": "device.limit_reached", "http_status": 409 },
+    { "code": "request.idempotency_conflict", "http_status": 409 },
+    { "code": "service.temporarily_unavailable", "http_status": 503 }
+  ]
+}

@@ -76,16 +76,12 @@ impl DeviceSecretStore for MacOsKeychain {
     }
 
     fn retrieve(&self, identity: &KeyIdentity) -> CryptoResult<SigningSecret> {
-        let query = retrieval_dictionary(identity, false);
+        let query = retrieval_dictionary(identity, true, true);
         let value = copy_matching(&query)?;
-        let data = value
-            .downcast::<CFData>()
+        let attributes = value
+            .downcast::<CFDictionary>()
             .ok_or(CryptoError::StorageUnavailable)?;
-        let bytes: [u8; 32] = data
-            .bytes()
-            .try_into()
-            .map_err(|_| CryptoError::StorageUnavailable)?;
-        Ok(SigningSecret::from_storage_bytes(bytes))
+        retrieved_secret(&attributes)
     }
 
     fn replace(&self, identity: &KeyIdentity, secret: &SigningSecret) -> CryptoResult<()> {
@@ -114,31 +110,12 @@ impl DeviceSecretStore for MacOsKeychain {
     }
 
     fn metadata(&self, identity: &KeyIdentity) -> CryptoResult<StorageMetadata> {
-        let query = retrieval_dictionary(identity, true);
+        let query = retrieval_dictionary(identity, true, false);
         let value = copy_matching(&query)?;
         let attributes = value
             .downcast::<CFDictionary>()
             .ok_or(CryptoError::StorageUnavailable)?;
-        let accessible = dictionary_value_matches(
-            &attributes,
-            static_string(security_constant!(kSecAttrAccessible)),
-            static_string(security_constant!(
-                kSecAttrAccessibleWhenUnlockedThisDeviceOnly
-            )),
-        );
-        let synchronizable = dictionary_value_matches(
-            &attributes,
-            static_string(security_constant!(kSecAttrSynchronizable)),
-            CFBoolean::true_value().into_CFType(),
-        );
-        if !accessible || synchronizable {
-            return Err(CryptoError::StorageInvalidConfiguration);
-        }
-        Ok(StorageMetadata {
-            backend: StorageBackend::MacOsDataProtectionKeychain,
-            protection: StorageProtection::WhenUnlockedThisDeviceOnly,
-            roaming: StorageRoaming::Disabled,
-        })
+        validated_metadata(&attributes)
     }
 }
 
@@ -188,16 +165,24 @@ fn item_dictionary(
     dictionary(pairs)
 }
 
-fn retrieval_dictionary(identity: &KeyIdentity, attributes: bool) -> CFDictionary<CFType, CFType> {
+fn retrieval_dictionary(
+    identity: &KeyIdentity,
+    attributes: bool,
+    data: bool,
+) -> CFDictionary<CFType, CFType> {
     let mut pairs = identity_pairs(identity);
-    pairs.push((
-        static_string(if attributes {
-            security_constant!(kSecReturnAttributes)
-        } else {
-            security_constant!(kSecReturnData)
-        }),
-        CFBoolean::true_value().into_CFType(),
-    ));
+    if attributes {
+        pairs.push((
+            static_string(security_constant!(kSecReturnAttributes)),
+            CFBoolean::true_value().into_CFType(),
+        ));
+    }
+    if data {
+        pairs.push((
+            static_string(security_constant!(kSecReturnData)),
+            CFBoolean::true_value().into_CFType(),
+        ));
+    }
     dictionary(pairs)
 }
 
@@ -270,6 +255,60 @@ fn copy_matching(query: &CFDictionary<CFType, CFType>) -> CryptoResult<CFType> {
     Ok(unsafe { CFType::wrap_under_create_rule(result) })
 }
 
+fn validated_metadata(attributes: &CFDictionary) -> CryptoResult<StorageMetadata> {
+    let accessible = dictionary_value_matches(
+        attributes,
+        static_string(security_constant!(kSecAttrAccessible)),
+        static_string(security_constant!(
+            kSecAttrAccessibleWhenUnlockedThisDeviceOnly
+        )),
+    );
+    let synchronizable = dictionary_value_matches(
+        attributes,
+        static_string(security_constant!(kSecAttrSynchronizable)),
+        CFBoolean::false_value().into_CFType(),
+    );
+    if !accessible || !synchronizable {
+        return Err(CryptoError::StorageInvalidConfiguration);
+    }
+    Ok(StorageMetadata {
+        backend: StorageBackend::MacOsDataProtectionKeychain,
+        protection: StorageProtection::WhenUnlockedThisDeviceOnly,
+        roaming: StorageRoaming::Disabled,
+    })
+}
+
+fn retrieved_secret(attributes: &CFDictionary) -> CryptoResult<SigningSecret> {
+    validated_metadata(attributes)?;
+    let data = dictionary_value(attributes, static_string(security_constant!(kSecValueData)))
+        .and_then(|value| value.downcast::<CFData>())
+        .ok_or(CryptoError::StorageUnavailable)?;
+    let bytes: [u8; 32] = data
+        .bytes()
+        .try_into()
+        .map_err(|_| CryptoError::StorageUnavailable)?;
+    Ok(SigningSecret::from_storage_bytes(bytes))
+}
+
+fn dictionary_value(dictionary: &CFDictionary, key: CFType) -> Option<CFType> {
+    let mut value = ptr::null();
+    // SAFETY: the dictionary and key remain owned for the lookup. A successful
+    // get-rule wrap retains the borrowed value before the dictionary can drop.
+    let found = unsafe {
+        CFDictionaryGetValueIfPresent(
+            dictionary.as_concrete_TypeRef(),
+            key.as_concrete_TypeRef().cast(),
+            &mut value,
+        )
+    };
+    if found == 0 || value.is_null() {
+        return None;
+    }
+    // SAFETY: `value` is a live Core Foundation object borrowed from the
+    // dictionary. The get-rule wrapper retains it for the returned owner.
+    Some(unsafe { CFType::wrap_under_get_rule(value.cast()) })
+}
+
 fn dictionary_value_matches(dictionary: &CFDictionary, key: CFType, expected: CFType) -> bool {
     let mut value = ptr::null();
     // SAFETY: the dictionary and key remain owned for the lookup. The returned
@@ -297,5 +336,110 @@ fn classify_status(status: i32) -> CryptoError {
         ERR_SEC_NOT_AVAILABLE => CryptoError::StorageKeychainUnavailable,
         ERR_SEC_PARAM => CryptoError::StorageInvalidConfiguration,
         _ => CryptoError::StorageUnavailable,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::crypto::public_key;
+
+    fn retrieved_item(
+        accessible: CFType,
+        synchronizable: Option<bool>,
+        secret: Option<&[u8]>,
+    ) -> CFDictionary {
+        let mut pairs = vec![(
+            static_string(security_constant!(kSecAttrAccessible)),
+            accessible,
+        )];
+        if let Some(synchronizable) = synchronizable {
+            pairs.push((
+                static_string(security_constant!(kSecAttrSynchronizable)),
+                if synchronizable {
+                    CFBoolean::true_value().into_CFType()
+                } else {
+                    CFBoolean::false_value().into_CFType()
+                },
+            ));
+        }
+        if let Some(secret) = secret {
+            pairs.push((
+                static_string(security_constant!(kSecValueData)),
+                CFData::from_buffer(secret).into_CFType(),
+            ));
+        }
+        dictionary(pairs).into_untyped()
+    }
+
+    #[test]
+    fn retrieved_secret_requires_exact_value_and_security_metadata() {
+        let bytes = [0x27; 32];
+        let item = retrieved_item(
+            static_string(security_constant!(
+                kSecAttrAccessibleWhenUnlockedThisDeviceOnly
+            )),
+            Some(false),
+            Some(&bytes),
+        );
+        let secret = retrieved_secret(&item).expect("synthetic item should validate");
+        assert_eq!(
+            public_key(&secret),
+            public_key(&SigningSecret::from_storage_bytes(bytes))
+        );
+    }
+
+    #[test]
+    fn retrieved_secret_rejects_missing_or_synchronizing_metadata() {
+        let bytes = [0x38; 32];
+        let missing_sync = retrieved_item(
+            static_string(security_constant!(
+                kSecAttrAccessibleWhenUnlockedThisDeviceOnly
+            )),
+            None,
+            Some(&bytes),
+        );
+        let synchronizing = retrieved_item(
+            static_string(security_constant!(
+                kSecAttrAccessibleWhenUnlockedThisDeviceOnly
+            )),
+            Some(true),
+            Some(&bytes),
+        );
+
+        assert!(matches!(
+            retrieved_secret(&missing_sync),
+            Err(CryptoError::StorageInvalidConfiguration)
+        ));
+        assert!(matches!(
+            retrieved_secret(&synchronizing),
+            Err(CryptoError::StorageInvalidConfiguration)
+        ));
+    }
+
+    #[test]
+    fn retrieved_secret_rejects_wrong_accessibility_and_secret_length() {
+        let bytes = [0x49; 31];
+        let wrong_accessibility = retrieved_item(
+            CFString::new("wrong-accessibility").into_CFType(),
+            Some(false),
+            Some(&[0x5a; 32]),
+        );
+        let wrong_length = retrieved_item(
+            static_string(security_constant!(
+                kSecAttrAccessibleWhenUnlockedThisDeviceOnly
+            )),
+            Some(false),
+            Some(&bytes),
+        );
+
+        assert!(matches!(
+            retrieved_secret(&wrong_accessibility),
+            Err(CryptoError::StorageInvalidConfiguration)
+        ));
+        assert!(matches!(
+            retrieved_secret(&wrong_length),
+            Err(CryptoError::StorageUnavailable)
+        ));
     }
 }
