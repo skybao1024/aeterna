@@ -4,6 +4,8 @@
 - Date: 2026-09-22
 - Decision owner: Product notification, consent, and recovery UX
 - Approval: Explicit user approval on 2026-09-22
+- Implementation: I12 accepted on 2026-09-27; AWS SES selected, production
+  sending disabled pending launch approval and live-send acceptance
 - Governing documents: [`../DESIGN.md`](../DESIGN.md),
   [`../DEVELOPMENT_PLAN.md`](../DEVELOPMENT_PLAN.md)
 

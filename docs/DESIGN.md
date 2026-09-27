@@ -804,6 +804,11 @@ All automated remote notifications in v1 use email. The product does not
 collect phone numbers, configure SMS, advertise multichannel delivery, or
 silently route messages through another channel.
 
+AWS SES v2 is the selected production email provider. The adapter and signed
+SNS transport-evidence boundary are implemented, but production sending remains
+disabled until the sender, Region, jurisdictions, retention, and live-send
+acceptance gates are approved.
+
 | Notification                 | Channel                     | Purpose                                                        |
 | :--------------------------- | :-------------------------- | :------------------------------------------------------------- |
 | Owner Warning                | Email + local notification  | Prevent an unintended release during warning and grace periods |
@@ -1104,11 +1109,13 @@ fuzzing, and penetration review before release. 禁止使用已弃用的
 2. 不活跃期限、预警期和宽限期的默认值与最小值。
 3. 每账户最大设备数和联系人数量。
 4. 大附件的受审计流式加密格式与 v1 文件大小上限。
-5. 邮件、KMS、支付和数据库的最终供应商及数据驻留区域。
+5. AWS SES 已选为邮件供应商；其发送实体、Region、数据驻留，以及 KMS、支付和数据库的最终供应商与区域仍待确定。
 6. 两种披露模式的最终文案、重试节奏、拒绝和地址失效后的具体操作细节。
 7. 免费邮件额度与长期服务成本模型。
 8. 审计日志和发送记录的具体保留期限。
-9. Provider-policy and jurisdiction review for the one-time neutral email sent
-   to a private, previously unverified Notification Target.
+9. The I12 provider-policy and jurisdiction review is complete with a
+   fail-closed result: no production recipient-jurisdiction set is approved for
+   the one-time neutral email to a private, previously unverified Notification
+   Target.
 
 这些是实施和运营参数，不再构成当前架构的未解核心矛盾。进入 Phase 0 后，任何活动检测或密码学原型未达到验收标准，都必须先更新本文档和对应 ADR，不能通过降低安全要求绕过。
