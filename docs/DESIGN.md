@@ -1,7 +1,7 @@
 # Aeterna v4.0 — 产品与架构设计文档
 
 > 状态：可进入技术原型阶段  
-> 更新日期：2026-09-16  
+> 更新日期：2026-09-22
 > 文档范围：Windows/macOS 桌面端、本地保险箱、设备活动心跳、云端通知与延迟紧急恢复
 
 ## 1. 项目定义
@@ -33,6 +33,9 @@ Aeterna 不是死亡证明系统。它只能够判断：
 - 不生成遗嘱或其他法律文书。
 - 不接入 LLM，不保存第三方 AI API Key。
 - 不绕过 Windows/macOS 登录、BitLocker、FileVault 或其他全盘加密。
+- v1 does not collect contact phone numbers, send SMS, or expose SMS settings.
+  Adding another remote notification channel requires a later approved ADR,
+  privacy review, provider review, and explicit delivery semantics.
 - 不承诺永久可用、绝对准时或“数学上绝对安全”。
 
 ### 1.3 Release sequencing
@@ -60,8 +63,9 @@ any Windows production hardening, packaging, support claim, or release.
 | 术语              | 含义                                                          |
 | :---------------- | :------------------------------------------------------------ |
 | Owner             | 创建并维护保险箱的用户                                        |
-| Contact           | Owner 指定的通知联系人                                        |
-| Recovery Contact  | 被授权在最终释放后执行紧急恢复的联系人                        |
+| Contact           | Owner 指定的通知对象或已经确认的恢复联系人                    |
+| Notification Target | Owner 指定、但尚未接受和验证的邮件通知对象                  |
+| Recovery Contact  | 已经接受、验证并被授权在最终释放后执行紧急恢复的联系人        |
 | Device            | 已绑定账户、能够提交活动心跳的电脑                            |
 | Vault             | 某台设备上的本地加密保险箱                                    |
 | MP                | Master Password，Owner 日常使用的主密码                       |
@@ -89,8 +93,8 @@ any Windows production hardening, packaging, support claim, or release.
 - 已被恶意软件控制或已经解锁的操作系统仍然安全。
 - 掌握电脑登录密码的人不会访问 Aeterna 以外的本地文件。
 - 电脑损坏、磁盘损坏且无其他本地副本时仍能恢复资料。
-- 邮件、短信和网络服务永远可达。
-- 联系人邮箱或手机号永远有效。
+- 邮件和网络服务永远可达。
+- 联系人邮箱永远有效，或者未验证联系人一定会阅读未来邮件。
 - SRS 一旦正式释放，系统无法保证收回已经获得的解密能力。
 
 ## 4. 总体架构
@@ -114,7 +118,7 @@ any Windows production hardening, packaging, support claim, or release.
 │ Account / Device / Policy / Heartbeat State                   │
 │ Warning + Grace + Release State Machine                       │
 │ Encrypted SRS / Contacts / Notification Templates            │
-│ Transactional Outbox / Email / SMS / Payment                  │
+│ Transactional Outbox / Email / Payment                        │
 └──────────────────────────┬───────────────────────────────────┘
                            │ final notification + claim link
                            ▼
@@ -134,9 +138,9 @@ any Windows production hardening, packaging, support claim, or release.
 | SRS                          | 设置时仅短暂进入内存 |    加密保存    |
 | 设备 ID、公钥、最后心跳      |          是          |       是       |
 | 不活跃策略和状态             |         缓存         |       是       |
-| 联系人邮箱、手机号           |     可缓存且加密     | 是，字段级加密 |
+| 联系人邮箱                   |     可缓存且加密     | 是，字段级加密 |
 | 通知内容和位置说明           |     可缓存且加密     | 是，字段级加密 |
-| 支付和短信额度               |          否          |       是       |
+| 支付和授权状态               |          否          |       是       |
 
 服务端能够在发送时读取联系人地址和通知正文，因此通知数据不是端到端零知识数据。产品只能承诺保险箱内容不上传，不能宣称服务端不接触任何个人信息。
 
@@ -151,11 +155,51 @@ any Windows production hardening, packaging, support claim, or release.
 5. 应用随机生成 ERC，要求 Owner 打印、抄写或保存到 U 盘。
 6. 服务端为该设备生成 SRS；应用建立延迟恢复包装后立即清理内存中的 SRS。
 7. Owner 设置不活跃期限、联系人和通知内容。
-8. Recovery Contact 完成邮箱验证或明确同意接收。
-9. Owner 选择 ERC 和电脑访问凭据的保管方式。
-10. 应用检查自启动和活动检测能力，提交首次有效心跳。
+8. For each contact, Owner answers one product question: notify the person now,
+   or keep the setup private until release.
+9. A notify-now recipient receives a neutral email invitation and becomes a
+   Recovery Contact only after accepting and verifying the address. A private
+   recipient remains an unverified Notification Target and receives no setup
+   email.
+10. Owner 选择 ERC 和电脑访问凭据的保管方式。
+11. 应用检查自启动和活动检测能力，提交首次有效心跳。
 
-### 5.2 两种凭据保管方式
+### 5.2 Contact disclosure modes
+
+The setup UI asks only whether Aeterna should tell the person now. Channel,
+retry, and escalation details are system-managed rather than presented as a
+notification workflow builder.
+
+#### A. Private until release
+
+- No message is sent while the account remains active.
+- The record is a Notification Target, not a Recovery Contact.
+- The UI labels the address as unverified and states that future delivery and
+  readership cannot be guaranteed.
+- At `RELEASED`, Aeterna may send only a fixed neutral invitation. It identifies
+  Owner by default so the recipient can assess legitimacy, but it contains no
+  custom message, trigger reason, device location, recovery instructions, ERC,
+  SRS, or Claim Token.
+- The recipient must accept and verify the email address before becoming a
+  Recovery Contact or receiving a recovery claim.
+- A second Notification Target is recommended because no pre-release delivery
+  test is possible, but v1 does not make the user design an escalation tree.
+
+#### B. Confirm now (recommended)
+
+- Aeterna sends a neutral invitation during setup. It discloses only that Owner
+  selected the recipient as a recovery contact; it does not disclose the
+  custom message, trigger condition, vault contents, credentials, or recovery
+  material.
+- The recipient can accept or decline without creating a password. Acceptance
+  verifies the email address and promotes the record to Recovery Contact.
+- A confirmed contact can receive a constrained test email and gives Owner
+  evidence that the address was controlled at least once.
+
+Private mode is a privacy choice, not a delivery guarantee. Confirm-now mode is
+the default recommendation because it permits consent and reachability testing.
+
+### 5.3 两种凭据保管方式
 
 #### A. 高度信任模式
 
@@ -178,7 +222,7 @@ Owner 将以下内容保存到纸张、U 盘、保险柜或密封信封：
 
 云端通知只说明去哪里取得这些内容，不包含任何密码或 ERC。
 
-### 5.3 日常运行
+### 5.4 日常运行
 
 - 应用随目标用户登录系统后在后台启动。
 - 单纯开机、启动应用或设备唤醒不构成有效活动。
@@ -189,17 +233,21 @@ Owner 将以下内容保存到纸张、U 盘、保险柜或密封信封：
 - 客户端提交签名心跳；服务端以接收时间更新账户期限。
 - 用户不需要打开 Aeterna，也不需要定期手动确认。
 
-### 5.4 最终恢复
+### 5.5 最终恢复
 
 1. 所有设备超过不活跃期限。
 2. 服务端向 Owner 发送预警并进入宽限期。
 3. 宽限期内未收到有效心跳，状态变为 `RELEASED`。
-4. 服务端通知 Recovery Contact，并提供一次性领取链接。
-5. 联系人根据通知取得电脑、系统访问方式和 ERC。
-6. 联系人在本地 Aeterna 中进入“紧急恢复”。
-7. 联系人通过通知链接和邮箱 OTP 取得短期 Claim Token。
-8. 本地应用使用 Claim Token 向服务端领取该设备对应的 SRS。
-9. 应用使用 ERC + SRS 解开本地 VDK，展示保险箱内容。
+4. 服务端通过邮件向已确认的 Recovery Contact 发送带时限的领取链接。
+5. For a private Notification Target, the service first sends only the neutral
+   invitation. Acceptance and email verification promote the record to
+   Recovery Contact; only then does the service issue a separate recovery
+   claim email.
+6. 联系人根据通知取得电脑、系统访问方式和 ERC。
+7. 联系人在本地 Aeterna 中进入“紧急恢复”。
+8. 联系人通过通知链接和邮箱 OTP 取得短期 Claim Token。
+9. 本地应用使用 Claim Token 向服务端领取该设备对应的 SRS。
+10. 应用使用 ERC + SRS 解开本地 VDK，展示保险箱内容。
 
 ## 6. Activity detection and heartbeat
 
@@ -386,7 +434,8 @@ RELEASED
 - `RELEASED` 是安全边界；SRS 可能已被领取，系统不能声称能够撤回。
 - 所有状态转换使用数据库事务和 compare-and-set 条件。
 - 状态转换与通知任务通过 Transactional Outbox 同一事务写入。
-- 邮件和短信发送使用稳定的幂等键，防止重复通知。
+- Every email operation uses a stable idempotency key so retries cannot create
+  duplicate invitations, releases, or claims.
 
 ### 7.4 服务中断规则
 
@@ -451,6 +500,9 @@ RKEK = HKDF-SHA-256(
 ### 8.4 领取与认证
 
 - Recovery Contact 必须是已经验证的联系人。
+- A private Notification Target has no recovery authority. It must accept the
+  release-time invitation and complete email verification before promotion to
+  Recovery Contact and before any claim is issued.
 - 最终通知包含短期、单用途 Claim Link，不包含 ERC 或主密码。
 - 联系人再次通过邮箱 OTP 后取得 Claim Token。
 - Claim Token 绑定 `account_id`、`contact_id`、`recovery_id`、有效期和允许操作。
@@ -592,8 +644,8 @@ dialog, shell, network, archive, or generic execution plugin.
 - 维护账户状态机；
 - 保存通知策略、联系人和通知文本；
 - 加密保存 SRS 并执行延迟释放；
-- 邮件和短信发送；
-- 支付回调、授权和短信额度；
+- 邮件发送、退信处理和发送状态审计；
+- 支付回调和授权状态；
 - 审计、限频和滥用防护。
 
 ### 11.2 云端数据模型
@@ -645,9 +697,12 @@ CREATE TABLE contacts (
     account_id UUID NOT NULL REFERENCES accounts(id),
     email_ciphertext BYTEA NOT NULL,
     email_lookup_hmac BYTEA NOT NULL,
-    phone_ciphertext BYTEA,
     role TEXT NOT NULL,
+    disclosure_mode TEXT NOT NULL,
     consent_status TEXT NOT NULL,
+    invitation_sent_at TIMESTAMPTZ,
+    accepted_at TIMESTAMPTZ,
+    declined_at TIMESTAMPTZ,
     verified_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -684,7 +739,15 @@ CREATE TABLE delivery_attempts (
 );
 ```
 
-支付、授权和短信额度使用独立表。不得信任客户端本地的 `is_pro` 或 `sms_quota`。
+For v1, `contacts.disclosure_mode` is the closed set `CONFIRM_NOW` or
+`PRIVATE_UNTIL_RELEASE`. `contacts.consent_status` is the closed set
+`NOT_REQUESTED`, `INVITED`, `ACCEPTED`, or `DECLINED`. Only `ACCEPTED` together
+with a non-null `verified_at` authorizes Recovery Contact behavior. Database
+constraints and service-domain types enforce these values; callers cannot
+submit arbitrary states.
+
+Payment and entitlement state use separate tables. The service must not trust a
+client-local `is_pro` or equivalent entitlement flag.
 
 ### 11.3 心跳存储最小化
 
@@ -704,7 +767,8 @@ DELETE /v1/devices/{id}
 POST   /v1/heartbeat
 PUT    /v1/policy
 POST   /v1/contacts
-POST   /v1/contacts/{id}/verify
+POST   /v1/contacts/{id}/invite
+POST   /v1/contact-invitations/respond
 POST   /v1/notifications/test
 POST   /v1/recovery/claim/start
 POST   /v1/recovery/claim/verify
@@ -734,51 +798,84 @@ public endpoints.
 
 ## 12. 通知系统
 
-### 12.1 通知层级
+### 12.1 v1 delivery model
 
-| 层级           | 渠道             | 用途                       |
-| :------------- | :--------------- | :------------------------- |
-| Owner Warning  | 邮件 + 本地通知  | 到期前和宽限期内阻止误触发 |
-| Base Contact   | 云端邮件         | 最终释放后的基础通知       |
-| Pro Contact    | 邮件 + 短信      | 最终释放后的多渠道通知     |
-| Recovery Claim | 带时限链接 + OTP | 领取 SRS，不包含 ERC       |
+All automated remote notifications in v1 use email. The product does not
+collect phone numbers, configure SMS, advertise multichannel delivery, or
+silently route messages through another channel.
 
-`mailto:` 仅可作为设置和测试时的辅助渠道，不承担最终自动通知职责。
+| Notification                 | Channel                     | Purpose                                                        |
+| :--------------------------- | :-------------------------- | :------------------------------------------------------------- |
+| Owner Warning                | Email + local notification  | Prevent an unintended release during warning and grace periods |
+| Confirm-now Invitation       | Email                       | Request consent and verify a contact during setup              |
+| Private Release Invitation   | Email                       | Ask an unverified target to accept after `RELEASED`            |
+| Recovery Release             | Email                       | Notify an accepted and verified Recovery Contact               |
+| Recovery Claim               | Time-limited link + email OTP | Obtain SRS without including ERC                              |
 
-### 12.2 通知内容约束
+`mailto:` may assist manual sharing or testing but is never the automated
+delivery mechanism. A provider acceptance or delivery event is evidence about
+transport only; it is not proof that a person read or understood the message.
 
-- 使用固定安全模板为主。
-- 自定义内容使用纯文本、长度上限和严格转义。
-- 禁止附件、任意 HTML、邮件头和可执行内容。
-- UI 强提醒不得填写主密码、ERC、助记词、资产密码或其他秘密。
-- 可以填写设备位置、密封信封位置和恢复步骤。
-- 联系人地址和正文在服务端字段级加密，但发送供应商仍能看到发送内容。
+### 12.2 Notification content constraints
 
-### 12.3 联系人验证与防滥用
+- System-controlled safe templates are the default.
+- A pre-verification invitation is fixed and neutral. It may identify Owner and
+  the requested recovery-contact role, but contains no custom message, trigger
+  reason, device or sealed-envelope location, recovery instruction, claim,
+  credential, or secret.
+- Owner-authored content is available only after the recipient accepts and
+  verifies the address. It is plaintext with a length limit and strict escaping.
+- Attachments, arbitrary HTML, caller-controlled headers, and executable content
+  are forbidden.
+- The UI warns Owner never to enter MP, ERC, seed phrases, asset passwords, or
+  other secrets. Post-verification instructions may describe a device or sealed
+  envelope location and recovery steps.
+- Contact addresses and message bodies are field-encrypted at rest, but the
+  selected email provider can observe delivery addresses and rendered messages.
 
-- Recovery Contact 必须完成邮箱验证或明确同意。
-- 提供测试通知，验证地址可达性。
-- 联系人可拒绝或退订非必要通知。
-- 对账户、设备、IP、邮箱和手机号实施分层限频。
-- Turnstile 等浏览器挑战只在独立低权限验证页面运行，不加载到 Vault 主窗口。
-- 自定义文本和 URL 受到限制，防止把系统用作匿名骚扰或钓鱼渠道。
+### 12.3 Contact consent, verification, and abuse prevention
 
-### 12.4 计费原则
+- Confirm-now is the recommended default. The recipient can accept or decline,
+  and a record becomes Recovery Contact only after acceptance and email
+  verification.
+- Private-until-release creates only a Notification Target. It receives no
+  setup or test email, has no recovery authority, and is visibly labeled
+  unverified and best-effort in Owner UI.
+- At release, a private target receives only the neutral invitation. A recovery
+  claim cannot be issued until that recipient accepts and verifies the address.
+- Confirmed contacts may receive a constrained test email. Private targets
+  cannot be test-delivered without violating the selected disclosure mode.
+- Invitation and claim tokens are short-lived, single-purpose, stored only as
+  keyed lookup values or equivalent non-plaintext verifiers, and invalidated by
+  acceptance, decline, replacement, expiry, or account deletion. Secrets do not
+  appear in API paths, query strings, proxy logs, analytics, or referrers; the
+  browser submits them in a bounded request body from the isolated verification
+  page.
+- A recipient can decline and request deletion or suppress further nonessential
+  mail. Decline never reveals Owner-authored content.
+- Account, device, IP, and email limits prevent invitation spam and enumeration.
+- Browser challenges such as Turnstile run only on a separate low-privilege
+  verification page, never inside the privileged Vault window.
+- Custom text and URLs remain constrained so the service cannot become an
+  anonymous harassment, phishing, or bulk-mail channel.
 
-核心恢复不能在触发时才发现订阅或额度不足：
+### 12.4 Billing principles
 
-- 基础邮件通知和已经配置的 Recovery Release 不因 Pro 过期而静默失效。
-- 短信可以是付费增强，但必须在预警阶段提前检查额度。
-- 短信额度不足时通知 Owner，并保留邮件兜底。
-- 关键通知任务不得依赖客户端本地授权状态。
-- 商业模型必须覆盖长期服务成本，不使用“永久免费、永久可用”承诺。
+Core recovery cannot discover at trigger time that a subscription or commercial
+entitlement has silently disabled delivery:
+
+- Base email warnings, accepted contact invitations, and configured Recovery
+  Releases remain available regardless of Pro expiration.
+- Critical notification jobs do not depend on client-local entitlement state.
+- The commercial model must cover long-term email delivery and retention costs
+  without promising that the service is free or available forever.
 
 ## 13. 隐私与数据生命周期
 
 ### 13.1 服务端处理的个人数据
 
 - Owner 邮箱；
-- 联系人邮箱和可选手机号；
+- 联系人邮箱、披露模式、邀请状态和同意记录；
 - 设备名称、公钥和最后活动时间；
 - 不活跃策略；
 - 通知文本和位置说明；
@@ -829,7 +926,7 @@ public endpoints.
 - Owner、联系人与服务端运营方串通；
 - 已经正式释放并被复制的数据；
 - 无任何本地副本时的硬件损坏；
-- 邮件供应商、短信供应商或互联网长期不可用。
+- 邮件供应商或互联网长期不可用。
 
 ### 14.3 安全工程要求
 
@@ -849,9 +946,8 @@ public endpoints.
 | 所有设备离线   | 进入正常预警和宽限流程                                 |
 | 客户端网络中断 | 只重试新鲜活动，不重放陈旧活动                         |
 | 服务端中断     | 延迟状态机；恢复后重新执行完整宽限期                   |
-| 邮件失败       | 重试、备用渠道、Owner 警告和人工可见状态               |
-| 短信不足       | 提前警告，邮件兜底                                     |
-| 联系人地址失效 | 测试通知、退信检测、在 Owner 活跃时提示更新            |
+| 邮件失败       | 重试、退信可见性、额外联系人和 Owner 活跃时警告         |
+| 联系人地址失效 | 已确认联系人测试邮件、退信检测、Owner 活跃时提示更新    |
 | SRS 数据丢失   | 加密备份、跨区域复制和定期恢复演练；丢失时无法紧急恢复 |
 | 项目停止运营   | 提前通知并提供将延迟恢复转换为离线恢复的迁移工具       |
 
@@ -861,7 +957,7 @@ public endpoints.
 
 - v1 从第一天使用 `react-i18next`。
 - 默认语言为英文，同时支持简体中文；日文和西班牙文列入后续版本。
-- 所有 UI、邮件、短信、错误信息和恢复说明使用 i18n key。
+- 所有 UI、邮件、错误信息和恢复说明使用 i18n key。
 - 日期和数字使用 `Intl.DateTimeFormat` / `Intl.NumberFormat`。
 - 服务端统一使用 UTC，客户端仅在展示时转换时区。
 - CSS 使用逻辑属性，为 RTL 预留。
@@ -904,7 +1000,6 @@ fuzzing, and penetration review before release. 禁止使用已弃用的
 - Redis + Celery Worker / Beat（队列、重试和定时状态机）
 - KMS/HSM（生产环境的 SRS 与 PII 字段密钥）
 - 邮件供应商适配层
-- 短信供应商适配层
 - 托管的邮箱验证与支付页面
 
 官方服务端代码作为独立私有仓库维护。客户端公开仓库必须包含协议、数据边界、可观测网络行为和自托管兼容性所需的公开说明，但不得因此声称官方托管服务本身开源。服务端禁止提供 Vault、留言、影像或附件的上传接口。
@@ -994,7 +1089,7 @@ fuzzing, and penetration review before release. 禁止使用已弃用的
 
 ### Phase 4 — 商业化与强化
 
-- 短信增强、支付和签名 entitlement。
+- 支付和签名 entitlement。SMS is not part of v1 or this phase.
 - 灾备、区域冗余、项目终止迁移工具。
 - 渗透测试、外部密码学审查和正式发布。
 
@@ -1009,9 +1104,11 @@ fuzzing, and penetration review before release. 禁止使用已弃用的
 2. 不活跃期限、预警期和宽限期的默认值与最小值。
 3. 每账户最大设备数和联系人数量。
 4. 大附件的受审计流式加密格式与 v1 文件大小上限。
-5. 邮件、短信、KMS、支付和数据库的最终供应商及数据驻留区域。
-6. 联系人同意、拒绝和地址失效后的具体产品流程。
-7. 免费邮件、短信额度与长期服务成本模型。
+5. 邮件、KMS、支付和数据库的最终供应商及数据驻留区域。
+6. 两种披露模式的最终文案、重试节奏、拒绝和地址失效后的具体操作细节。
+7. 免费邮件额度与长期服务成本模型。
 8. 审计日志和发送记录的具体保留期限。
+9. Provider-policy and jurisdiction review for the one-time neutral email sent
+   to a private, previously unverified Notification Target.
 
 这些是实施和运营参数，不再构成当前架构的未解核心矛盾。进入 Phase 0 后，任何活动检测或密码学原型未达到验收标准，都必须先更新本文档和对应 ADR，不能通过降低安全要求绕过。
