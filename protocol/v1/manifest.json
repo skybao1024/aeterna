@@ -1,12 +1,12 @@
 {
   "manifest_version": 1,
   "protocol_version": 1,
-  "release": "1.1.0",
-  "release_tag": "protocol-v1.1.0",
+  "release": "1.2.0",
+  "release_tag": "protocol-v1.2.0",
   "files": [
     {
       "path": "errors.json",
-      "sha256": "decc7db01a06855326e0546fd3f0ed48b1a74f546076f2c11ff9519a9263535a"
+      "sha256": "4f62a733898c9a9e79ea72f413db50740d58443de10a0c3654eaae73db6962e8"
     },
     {
       "path": "fixtures/invalid/account-challenge-duplicate-member.json",
@@ -27,6 +27,10 @@
     {
       "path": "fixtures/invalid/heartbeat-request-forbidden-data.json",
       "sha256": "dde8c921026a16f8b193dabfe2ab6f5c4c8dce96a2778a3969e204f0751ddb7b"
+    },
+    {
+      "path": "fixtures/invalid/recovery-record-provision-forbidden-data.json",
+      "sha256": "cdc1665495773fabc350e193166b5b2733447bc0fc657e4cea402feb7213fb10"
     },
     {
       "path": "fixtures/signatures/device-binding-approval.json",
@@ -69,6 +73,14 @@
       "sha256": "3aa9f050426b39e7efcfc86fdb3a15db30e018202d3a8f723abc178c52a7348e"
     },
     {
+      "path": "fixtures/signatures/recovery-record-confirm.json",
+      "sha256": "8913691edfcc55b1919b57aa6a2801d6f423eed504516ccaf40e3e649e0f889f"
+    },
+    {
+      "path": "fixtures/signatures/recovery-record-provision.json",
+      "sha256": "5bf5a2b76de1d0ac68cc7abb85f1ddc5d8d522bec237c724470f528e0f68a906"
+    },
+    {
       "path": "fixtures/valid/account-challenge-request.json",
       "sha256": "05743a26b8a7401e4ed28b37e1aa87d3cc0b9bb532357961f848489e5e7eb6e4"
     },
@@ -109,8 +121,48 @@
       "sha256": "de52ecbdc9006dabc0bd768a49aa5041148caa6c31bc1b3e169c3259a99abc21"
     },
     {
+      "path": "fixtures/valid/recovery-claim-start-request.json",
+      "sha256": "4277565cf93374dc1c675de5c8ba5a2d76f360e033b8e19dc9d0c64f1dff32b6"
+    },
+    {
+      "path": "fixtures/valid/recovery-claim-start-response.json",
+      "sha256": "d6d98321cb362dbe48779ef4eacb62b37c064c26a6fe3e87c9654f5c2ea03dae"
+    },
+    {
+      "path": "fixtures/valid/recovery-claim-verify-request.json",
+      "sha256": "fd176b2a3e3cd782c2291ef7404011c9a0d10b8d9f573af75027643f6614fe13"
+    },
+    {
+      "path": "fixtures/valid/recovery-claim-verify-response.json",
+      "sha256": "e41cb56b70cc3bcb285ba2a8256a98e8842564e8d3162a2ac778796bc57a56d0"
+    },
+    {
+      "path": "fixtures/valid/recovery-record-confirm-request.json",
+      "sha256": "f8440238acf2e2665caf5691f125abc66f3d72cda6aa01ce6d5391393118c15b"
+    },
+    {
+      "path": "fixtures/valid/recovery-record-provision-request.json",
+      "sha256": "e836d272fbb5389c4454143f7dc9ae320c8fcbe74bb83e31b8b918e79764c072"
+    },
+    {
+      "path": "fixtures/valid/recovery-record-provision-response.json",
+      "sha256": "ad089afba6958447ce79dec3b174303a46ba8dd67855b5bda9e9a2e2ce99ba6b"
+    },
+    {
+      "path": "fixtures/valid/recovery-record-response.json",
+      "sha256": "2c6f78c47feaf193911448c571fa3a7f2f3b03c3971ee897ebe9cecab35145bd"
+    },
+    {
+      "path": "fixtures/valid/recovery-secret-request.json",
+      "sha256": "7b790b69136c2ade1526fe66ed9b9582b1ec359c08bfbd30f2d06456ea16a573"
+    },
+    {
+      "path": "fixtures/valid/recovery-secret-response.json",
+      "sha256": "970a6281e5da7952b2fdb13dd081c14e0820cd6c693b48d55b3d7bcf00839d99"
+    },
+    {
       "path": "README.md",
-      "sha256": "8b623339fd80d7574c46afead0d1ea2254161a3b3862c81e2085dd86e1ca3186"
+      "sha256": "4984eb9897df36f74581c778944d2ce1a17ab68fe108ff45a24064d8136773ee"
     },
     {
       "path": "schemas/account-challenge-request.schema.json",
@@ -130,7 +182,7 @@
     },
     {
       "path": "schemas/common.schema.json",
-      "sha256": "1b7f94101a288029abdba4a5a1a548993e5b28522d0c93f0cce11a06ce634ce8"
+      "sha256": "861f2c2b83f21aadb4369932e18276d599d8903e1550588b72e25d6a1d1a75c0"
     },
     {
       "path": "schemas/device-binding-approval-request.schema.json",
@@ -171,7 +223,47 @@
     {
       "path": "schemas/heartbeat-response.schema.json",
       "sha256": "9b41d0808f550340ded17df86aaf9a46836ee183a82883e310e36ab8b1ed9837"
+    },
+    {
+      "path": "schemas/recovery-claim-start-request.schema.json",
+      "sha256": "deca19ad6090beb8207fe28f2944968b80cb618987bd35404e197bf1274f3efe"
+    },
+    {
+      "path": "schemas/recovery-claim-start-response.schema.json",
+      "sha256": "50c46da312139d6b7e0d372ad30467dd2e12426d70edff76142b57044c89e5bd"
+    },
+    {
+      "path": "schemas/recovery-claim-verify-request.schema.json",
+      "sha256": "c68d03aa1bde2f5513e3766fe8d9433c113e588403ef6cdd2dd71919b0b34324"
+    },
+    {
+      "path": "schemas/recovery-claim-verify-response.schema.json",
+      "sha256": "c0352db963f2d834e64851e9a3a45c26a52051b7d993d81c177da35514ffde27"
+    },
+    {
+      "path": "schemas/recovery-record-action-request.schema.json",
+      "sha256": "b916c862e06c8c703e1bc1aca61ef7629f8bd3db5e0f296de38c6fb544f1e83c"
+    },
+    {
+      "path": "schemas/recovery-record-provision-request.schema.json",
+      "sha256": "322f3469f68a6528f6b346f4606973de4cea4e721704fd48bf69d8b26c539066"
+    },
+    {
+      "path": "schemas/recovery-record-provision-response.schema.json",
+      "sha256": "e4015002ddbb71620947d396ca724299890beee1503b82a3a6ba978562bb19d3"
+    },
+    {
+      "path": "schemas/recovery-record-response.schema.json",
+      "sha256": "8ee03f704846984eb58bdd4eb97b8ebd80d8c80a187d8b4ea647eb3e7da37084"
+    },
+    {
+      "path": "schemas/recovery-secret-request.schema.json",
+      "sha256": "39a8533bacf86d8faab2bc13b8bbefc9294a2d3fc117d501101954e1d4ede8ac"
+    },
+    {
+      "path": "schemas/recovery-secret-response.schema.json",
+      "sha256": "9f1e47eb2a3dca236ca7e291313d7bf2cee04a6761430ff07e39e62118fa532f"
     }
   ],
-  "release_digest": "47334129068437fde38acb68ab9310d8e64c95629e2ef95645eb1cd1c7e4e0d9"
+  "release_digest": "456335ec6baf6f7161aa715263943427402ff675606fc68db79cb381572ed2e1"
 }

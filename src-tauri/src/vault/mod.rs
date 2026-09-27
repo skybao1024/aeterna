@@ -21,8 +21,8 @@ pub use item::{
     MAX_MEDIA_TYPE_BYTES, MAX_TITLE_BYTES, VaultAttachment, VaultItem,
 };
 pub use repository::{
-    DecryptedRecord, RecordId, RecordVersion, RecoveryMaterial, UnlockedVault, VaultBootstrap,
-    VaultRepository,
+    DecryptedRecord, RecordId, RecordVersion, RecoveryBinding, RecoveryEnrollment,
+    RecoveryMaterial, UnlockedVault, VaultBootstrap, VaultRepository,
 };
 pub(crate) use transfer::{
     TransferError, TransferObserver, cleanup_stale_import_artifacts, export_vault, import_vault,

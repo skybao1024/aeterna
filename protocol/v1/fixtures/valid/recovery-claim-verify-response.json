@@ -1,0 +1,14 @@
+{
+  "protocol_version": 1,
+  "request_id": "00000000-0000-4000-8000-000000000046",
+  "data": {
+    "account_id": "00000000-0000-4000-8000-000000000020",
+    "claim_token": "iIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIg",
+    "device_id": "00000000-0000-4000-8000-000000000003",
+    "expires_at": "2030-01-02T03:10:05Z",
+    "recovery_id": "00000000-0000-4000-8000-000000000041",
+    "scope": "recovery.srs.read",
+    "vault_id": "00000000-0000-4000-8000-000000000042",
+    "wrapper_digest": "ZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmY"
+  }
+}

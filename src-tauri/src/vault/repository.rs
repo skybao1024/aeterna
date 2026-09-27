@@ -15,7 +15,7 @@ use rusqlite::{
     Connection, OpenFlags, OptionalExtension, TransactionBehavior, config::DbConfig, limits::Limit,
     params,
 };
-use zeroize::Zeroizing;
+use zeroize::{Zeroize, Zeroizing};
 
 use crate::crypto::{
     Argon2Profile, DeviceId, ErcEntropy, MasterPassword, MasterSalt, MasterWrapper, RecoverySalt,
@@ -28,7 +28,7 @@ use super::{
     VaultError, VaultResult,
     format::{
         self, HeaderRow, MasterRow, RecoveryRow, decode_frame, encode_frame, header_aad,
-        read_array, record_aad, wrapper_digest,
+        read_array, record_aad, recovery_wrapper_digest, wrapper_digest,
     },
     migration::{self, to_sql_integer},
 };
@@ -107,6 +107,41 @@ impl RecoveryMaterial {
 
     pub fn recovery_salt(&self) -> &RecoverySalt {
         &self.recovery_salt
+    }
+
+    pub(crate) fn from_parts(erc: ErcEntropy, mut srs: [u8; 32]) -> Self {
+        let recovery_salt = RecoverySalt::from_bytes(srs);
+        srs.zeroize();
+        Self { erc, recovery_salt }
+    }
+}
+
+#[derive(Clone, Copy, Eq, PartialEq)]
+pub struct RecoveryBinding {
+    pub vault_id: [u8; 16],
+    pub device_id: [u8; 16],
+    pub recovery_id: [u8; 16],
+    pub wrapper_digest: [u8; 32],
+}
+
+impl fmt::Debug for RecoveryBinding {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("RecoveryBinding([REDACTED])")
+    }
+}
+
+pub struct RecoveryEnrollment {
+    pub binding: RecoveryBinding,
+    pub material: RecoveryMaterial,
+}
+
+impl fmt::Debug for RecoveryEnrollment {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("RecoveryEnrollment")
+            .field("binding", &self.binding)
+            .field("material", &"[REDACTED]")
+            .finish()
     }
 }
 
@@ -322,6 +357,18 @@ impl VaultRepository {
         })
     }
 
+    pub fn recovery_binding(&self) -> VaultResult<RecoveryBinding> {
+        let connection = self.connection()?;
+        let metadata = load_metadata(&connection)?;
+        validate_header_versions(&metadata.header)?;
+        Ok(RecoveryBinding {
+            vault_id: metadata.header.vault_id,
+            device_id: metadata.header.device_id,
+            recovery_id: metadata.recovery.recovery_id,
+            wrapper_digest: recovery_wrapper_digest(&metadata.recovery)?,
+        })
+    }
+
     pub fn change_master_password(
         &self,
         old_password: &MasterPassword,
@@ -450,6 +497,96 @@ impl VaultRepository {
 }
 
 impl UnlockedVault {
+    pub fn replace_recovery_wrapper(
+        &self,
+        recovery_id: [u8; 16],
+        mut srs: [u8; 32],
+    ) -> VaultResult<RecoveryEnrollment> {
+        let connection = self.repository.connection()?;
+        let metadata = load_metadata(&connection)?;
+        verify_header_authentication(&metadata, &self.vdk)?;
+        if recovery_id == metadata.recovery.recovery_id {
+            return Err(VaultError::Conflict);
+        }
+
+        let erc = ErcEntropy::generate()?;
+        let material = RecoveryMaterial::from_parts(erc, srs);
+        srs.zeroize();
+        let recovery_nonce = self.repository.reserve_nonce(RECOVERY_NONCE_PURPOSE)?;
+        let header_nonce = self.repository.reserve_nonce(HEADER_NONCE_PURPOSE)?;
+        let created_at_ms = self
+            .repository
+            .runtime
+            .clock
+            .now_ms()?
+            .max(metadata.header.updated_at_ms);
+        let replacement = RecoveryRow {
+            recovery_id,
+            device_id: metadata.header.device_id,
+            wrapper: create_recovery_wrapper_with_nonce(
+                material.erc(),
+                material.recovery_salt(),
+                &self.vdk,
+                wrapper_context(&metadata.header),
+                recovery_nonce,
+            )?,
+            created_at_ms,
+        };
+        let replacement_header = HeaderRow {
+            auth_nonce: header_nonce,
+            auth_tag: [0; 16],
+            updated_at_ms: created_at_ms,
+            ..metadata.header
+        };
+        let header_digest =
+            wrapper_digest(replacement_header.vault_id, &metadata.master, &replacement)?;
+        let aad = header_aad(&replacement_header, header_digest);
+        let auth_tag: [u8; 16] =
+            read_array(&encrypt_payload(&self.vdk, &header_nonce, &[], &aad)?)?;
+
+        let mut connection = self.repository.connection()?;
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let recovery_changed = transaction.execute(
+            "UPDATE recovery_wrapper SET recovery_id = ?1, device_id = ?2, format_version = ?3, aead_algorithm = ?4, purpose = ?5, nonce = ?6, ciphertext_and_tag = ?7, created_at_ms = ?8 WHERE singleton = 1 AND recovery_id = ?9",
+            params![
+                replacement.recovery_id.as_slice(),
+                replacement.device_id.as_slice(),
+                i64::from(replacement.wrapper.format_version),
+                i64::from(replacement.wrapper.aead_algorithm),
+                i64::from(replacement.wrapper.purpose),
+                replacement.wrapper.nonce.as_slice(),
+                replacement.wrapper.ciphertext_and_tag.as_slice(),
+                to_sql_integer(replacement.created_at_ms)?,
+                metadata.recovery.recovery_id.as_slice(),
+            ],
+        )?;
+        if recovery_changed != 1 {
+            return Err(VaultError::Conflict);
+        }
+        let header_changed = transaction.execute(
+            "UPDATE vault_header SET header_auth_nonce = ?1, header_auth_tag = ?2, updated_at_ms = ?3 WHERE singleton = 1 AND updated_at_ms = ?4",
+            params![
+                header_nonce.as_slice(),
+                auth_tag.as_slice(),
+                to_sql_integer(created_at_ms)?,
+                to_sql_integer(metadata.header.updated_at_ms)?,
+            ],
+        )?;
+        if header_changed != 1 {
+            return Err(VaultError::Conflict);
+        }
+        transaction.commit()?;
+        Ok(RecoveryEnrollment {
+            binding: RecoveryBinding {
+                vault_id: replacement_header.vault_id,
+                device_id: replacement_header.device_id,
+                recovery_id,
+                wrapper_digest: recovery_wrapper_digest(&replacement)?,
+            },
+            material,
+        })
+    }
+
     pub fn create_record(&self, plaintext: &[u8]) -> VaultResult<RecordVersion> {
         validate_plaintext_length(plaintext)?;
         let mut record_id = [0_u8; 16];
@@ -1399,6 +1536,39 @@ mod tests {
         };
         let reserved = repository.reserve_nonce(RECORD_NONCE_PURPOSE);
         assert!(matches!(reserved, Ok(value) if value.as_slice() == unique));
+        cleanup_owned_staging_files(&path);
+    }
+
+    #[test]
+    fn explicit_recovery_enrollment_replaces_discarded_material_atomically() {
+        let path = temporary_path("recovery-enrollment");
+        let bootstrap = VaultRepository::initialize(&path, &password(7), profile())
+            .expect("vault initialization should succeed");
+        let (repository, old_material) = bootstrap.into_parts();
+        let unlocked = repository
+            .unlock(&password(7))
+            .expect("master unlock should succeed");
+        let old_binding = repository
+            .recovery_binding()
+            .expect("old binding should load");
+        let enrollment = unlocked
+            .replace_recovery_wrapper([0x42; 16], [0x55; 32])
+            .expect("explicit enrollment should succeed");
+
+        assert_ne!(enrollment.binding.recovery_id, old_binding.recovery_id);
+        assert_ne!(
+            enrollment.binding.wrapper_digest,
+            old_binding.wrapper_digest
+        );
+        assert_eq!(enrollment.binding.vault_id, old_binding.vault_id);
+        assert_eq!(enrollment.binding.device_id, old_binding.device_id);
+        assert_eq!(
+            format!("{:?}", enrollment.binding),
+            "RecoveryBinding([REDACTED])"
+        );
+        assert!(repository.unlock_recovery(&old_material).is_err());
+        assert!(repository.unlock_recovery(&enrollment.material).is_ok());
+        assert_eq!(repository.recovery_binding(), Ok(enrollment.binding),);
         cleanup_owned_staging_files(&path);
     }
 

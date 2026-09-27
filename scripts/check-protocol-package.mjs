@@ -20,19 +20,31 @@ const forbiddenKeys = new Set([
   "window_title",
 ]);
 
-function inspectKeys(value, path) {
+const recoverySecretPaths = new Set([
+  "schemas/recovery-record-provision-response.schema.json",
+  "schemas/recovery-secret-response.schema.json",
+  "fixtures/valid/recovery-record-provision-response.json",
+  "fixtures/valid/recovery-secret-response.json",
+]);
+
+function inspectKeys(value, path, sourcePath = path) {
   if (Array.isArray(value)) {
-    value.forEach((entry, index) => inspectKeys(entry, `${path}[${index}]`));
+    value.forEach((entry, index) =>
+      inspectKeys(entry, `${path}[${index}]`, sourcePath),
+    );
     return;
   }
   if (value === null || typeof value !== "object") {
     return;
   }
   for (const [key, entry] of Object.entries(value)) {
-    if (forbiddenKeys.has(key.toLowerCase())) {
+    if (
+      forbiddenKeys.has(key.toLowerCase()) &&
+      !(key.toLowerCase() === "srs" && recoverySecretPaths.has(sourcePath))
+    ) {
       throw new Error(`Forbidden protocol field ${key} at ${path}.`);
     }
-    inspectKeys(entry, `${path}.${key}`);
+    inspectKeys(entry, `${path}.${key}`, sourcePath);
   }
 }
 

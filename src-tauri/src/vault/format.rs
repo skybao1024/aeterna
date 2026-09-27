@@ -19,6 +19,7 @@ pub const VAULT_MAGIC: [u8; 12] = *b"AETERNA-VLT\0";
 const HEADER_DOMAIN: &[u8; 14] = b"AETERNA-HEADER";
 pub(super) const HEADER_AAD_VERSION: u8 = 1;
 const WRAPPER_DOMAIN: &[u8; 19] = b"AETERNA-WRAPPERS-V1";
+const RECOVERY_WRAPPER_DIGEST_DOMAIN: &[u8] = b"AETERNA-RECOVERY-WRAPPER-DIGEST-v1\0";
 const RECORD_MAGIC: [u8; 8] = *b"AETRREC\0";
 const RECORD_DOMAIN: &[u8; 14] = b"AETERNA-RECORD";
 pub(super) const RECORD_AAD_VERSION: u8 = 1;
@@ -89,6 +90,23 @@ pub(super) fn wrapper_digest(
     encoded[191..203].copy_from_slice(&recovery.wrapper.nonce);
     copy_exact(&mut encoded[203..251], &recovery.wrapper.ciphertext_and_tag)?;
     encoded[251..259].copy_from_slice(&recovery.created_at_ms.to_be_bytes());
+    Ok(Sha256::digest(encoded).into())
+}
+
+pub(super) fn recovery_wrapper_digest(recovery: &RecoveryRow) -> VaultResult<[u8; 32]> {
+    let mut encoded = Vec::with_capacity(RECOVERY_WRAPPER_DIGEST_DOMAIN.len() + 104);
+    encoded.extend_from_slice(RECOVERY_WRAPPER_DIGEST_DOMAIN);
+    encoded.extend_from_slice(&recovery.recovery_id);
+    encoded.extend_from_slice(&recovery.device_id);
+    encoded.extend_from_slice(&recovery.wrapper.format_version.to_be_bytes());
+    encoded.push(recovery.wrapper.aead_algorithm);
+    encoded.push(recovery.wrapper.purpose);
+    encoded.extend_from_slice(&recovery.wrapper.nonce);
+    if recovery.wrapper.ciphertext_and_tag.len() != 48 {
+        return Err(VaultError::InvalidFormat);
+    }
+    encoded.extend_from_slice(&recovery.wrapper.ciphertext_and_tag);
+    encoded.extend_from_slice(&recovery.created_at_ms.to_be_bytes());
     Ok(Sha256::digest(encoded).into())
 }
 
@@ -221,6 +239,50 @@ mod tests {
         assert_eq!(&aad[39..55], &[0x22; 16]);
         assert_eq!(&aad[55..63], &3_u64.to_be_bytes());
         assert_eq!(&aad[79..83], &6_u32.to_be_bytes());
+    }
+
+    #[test]
+    fn recovery_wrapper_digest_binds_every_persisted_field() {
+        let row = RecoveryRow {
+            recovery_id: [0x11; 16],
+            device_id: [0x22; 16],
+            wrapper: RecoveryWrapper {
+                format_version: 1,
+                aead_algorithm: 1,
+                purpose: 2,
+                nonce: [0x33; 12],
+                ciphertext_and_tag: vec![0x44; 48],
+            },
+            created_at_ms: 5,
+        };
+        let digest = recovery_wrapper_digest(&row).expect("synthetic row is valid");
+        for mutation in 0..7 {
+            let mut changed = RecoveryRow {
+                recovery_id: row.recovery_id,
+                device_id: row.device_id,
+                wrapper: RecoveryWrapper {
+                    format_version: row.wrapper.format_version,
+                    aead_algorithm: row.wrapper.aead_algorithm,
+                    purpose: row.wrapper.purpose,
+                    nonce: row.wrapper.nonce,
+                    ciphertext_and_tag: row.wrapper.ciphertext_and_tag.clone(),
+                },
+                created_at_ms: row.created_at_ms,
+            };
+            match mutation {
+                0 => changed.recovery_id[0] ^= 1,
+                1 => changed.device_id[0] ^= 1,
+                2 => changed.wrapper.format_version += 1,
+                3 => changed.wrapper.aead_algorithm += 1,
+                4 => changed.wrapper.purpose += 1,
+                5 => changed.wrapper.nonce[0] ^= 1,
+                _ => changed.wrapper.ciphertext_and_tag[0] ^= 1,
+            }
+            assert_ne!(
+                recovery_wrapper_digest(&changed).expect("mutated row remains encodable"),
+                digest
+            );
+        }
     }
 
     #[test]

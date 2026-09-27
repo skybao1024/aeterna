@@ -25,6 +25,19 @@ const heartbeatForbiddenPath = `${protocolDirectory}fixtures/invalid/heartbeat-r
 const deviceStatusSignaturePath = `${protocolDirectory}fixtures/signatures/device-status-change.json`;
 const deviceStatusValidPath = `${protocolDirectory}fixtures/valid/device-status-change-request.json`;
 const deviceStatusResponsePath = `${protocolDirectory}fixtures/valid/device-status-change-response.json`;
+const recoveryProvisionSignaturePath = `${protocolDirectory}fixtures/signatures/recovery-record-provision.json`;
+const recoveryProvisionValidPath = `${protocolDirectory}fixtures/valid/recovery-record-provision-request.json`;
+const recoveryProvisionResponsePath = `${protocolDirectory}fixtures/valid/recovery-record-provision-response.json`;
+const recoveryConfirmSignaturePath = `${protocolDirectory}fixtures/signatures/recovery-record-confirm.json`;
+const recoveryConfirmValidPath = `${protocolDirectory}fixtures/valid/recovery-record-confirm-request.json`;
+const recoveryRecordResponsePath = `${protocolDirectory}fixtures/valid/recovery-record-response.json`;
+const recoveryClaimStartPath = `${protocolDirectory}fixtures/valid/recovery-claim-start-request.json`;
+const recoveryClaimStartResponsePath = `${protocolDirectory}fixtures/valid/recovery-claim-start-response.json`;
+const recoveryClaimVerifyPath = `${protocolDirectory}fixtures/valid/recovery-claim-verify-request.json`;
+const recoveryClaimVerifyResponsePath = `${protocolDirectory}fixtures/valid/recovery-claim-verify-response.json`;
+const recoverySecretRequestPath = `${protocolDirectory}fixtures/valid/recovery-secret-request.json`;
+const recoverySecretResponsePath = `${protocolDirectory}fixtures/valid/recovery-secret-response.json`;
+const recoveryProvisionForbiddenPath = `${protocolDirectory}fixtures/invalid/recovery-record-provision-forbidden-data.json`;
 const checkOnly = process.argv.includes("--check");
 
 function canonicalize(value) {
@@ -319,6 +332,161 @@ const deviceStatusResponseFixture = pretty({
   },
 });
 
+const recoveryIds = {
+  request: "00000000-0000-4000-8000-000000000040",
+  recovery: "00000000-0000-4000-8000-000000000041",
+  vault: "00000000-0000-4000-8000-000000000042",
+  confirmRequest: "00000000-0000-4000-8000-000000000043",
+  claimStartRequest: "00000000-0000-4000-8000-000000000044",
+  challenge: "00000000-0000-4000-8000-000000000045",
+  claimVerifyRequest: "00000000-0000-4000-8000-000000000046",
+  secretRequest: "00000000-0000-4000-8000-000000000047",
+};
+const syntheticSrs = base64url(Buffer.alloc(32, 0x55));
+const syntheticWrapperDigest = base64url(Buffer.alloc(32, 0x66));
+const syntheticClaimLinkToken = base64url(Buffer.alloc(32, 0x77));
+const syntheticClaimToken = base64url(Buffer.alloc(32, 0x88));
+
+function signedRecoveryFixture(document) {
+  const canonical = Buffer.from(canonicalize(document), "utf8");
+  const documentSignature = sign(null, canonical, primary.privateKey);
+  return {
+    signatureFixture: pretty({
+      fixture_version: 1,
+      seed: base64url(primary.seed),
+      public_key: base64url(primary.publicKey),
+      canonical_bytes: base64url(canonical),
+      signature: base64url(documentSignature),
+      document,
+    }),
+    envelope: {
+      protocol_version: 1,
+      signed: document,
+      signature: base64url(documentSignature),
+    },
+  };
+}
+
+const recoveryProvisionDocument = {
+  account_id: heartbeatDocument.account_id,
+  canonicalization: "jcs-rfc8785",
+  crypto_format_version: 1,
+  device_id: heartbeatDocument.device_id,
+  domain: "aeterna.recovery-record.provision.v1",
+  operation: "recovery_record.provision",
+  protocol_version: 1,
+  recovery_context_version: 1,
+  recovery_id: recoveryIds.recovery,
+  request_id: recoveryIds.request,
+  signature_version: 1,
+  vault_id: recoveryIds.vault,
+};
+const recoveryProvision = signedRecoveryFixture(recoveryProvisionDocument);
+const recoveryConfirmDocument = {
+  account_id: heartbeatDocument.account_id,
+  canonicalization: "jcs-rfc8785",
+  device_id: heartbeatDocument.device_id,
+  domain: "aeterna.recovery-record.confirm.v1",
+  operation: "recovery_record.confirm",
+  protocol_version: 1,
+  recovery_id: recoveryIds.recovery,
+  request_id: recoveryIds.confirmRequest,
+  signature_version: 1,
+  vault_id: recoveryIds.vault,
+  wrapper_digest: syntheticWrapperDigest,
+};
+const recoveryConfirm = signedRecoveryFixture(recoveryConfirmDocument);
+
+const recoveryProvisionResponseFixture = pretty({
+  protocol_version: 1,
+  request_id: recoveryIds.request,
+  data: {
+    account_id: heartbeatDocument.account_id,
+    device_id: heartbeatDocument.device_id,
+    expires_at: "2030-01-03T03:04:05Z",
+    kms_context_version: 1,
+    recovery_id: recoveryIds.recovery,
+    srs: syntheticSrs,
+    state: "pending_confirmation",
+    vault_id: recoveryIds.vault,
+  },
+});
+const recoveryRecordResponseFixture = pretty({
+  protocol_version: 1,
+  request_id: recoveryIds.confirmRequest,
+  data: {
+    account_id: heartbeatDocument.account_id,
+    device_id: heartbeatDocument.device_id,
+    recovery_id: recoveryIds.recovery,
+    state: "sealed",
+    updated_at: "2030-01-02T03:05:05Z",
+    vault_id: recoveryIds.vault,
+  },
+});
+const recoveryClaimStartFixture = pretty({
+  protocol_version: 1,
+  request_id: recoveryIds.claimStartRequest,
+  claim_link_token: syntheticClaimLinkToken,
+});
+const recoveryClaimStartResponseFixture = pretty({
+  protocol_version: 1,
+  request_id: recoveryIds.claimStartRequest,
+  data: {
+    challenge_id: recoveryIds.challenge,
+    expires_in_seconds: 600,
+    resend_after_seconds: 60,
+  },
+});
+const recoveryClaimVerifyFixture = pretty({
+  protocol_version: 1,
+  request_id: recoveryIds.claimVerifyRequest,
+  challenge_id: recoveryIds.challenge,
+  claim_link_token: syntheticClaimLinkToken,
+  code: "12345678",
+});
+const recoveryClaimVerifyResponseFixture = pretty({
+  protocol_version: 1,
+  request_id: recoveryIds.claimVerifyRequest,
+  data: {
+    account_id: heartbeatDocument.account_id,
+    claim_token: syntheticClaimToken,
+    device_id: heartbeatDocument.device_id,
+    expires_at: "2030-01-02T03:10:05Z",
+    recovery_id: recoveryIds.recovery,
+    scope: "recovery.srs.read",
+    vault_id: recoveryIds.vault,
+    wrapper_digest: syntheticWrapperDigest,
+  },
+});
+const recoverySecretRequestFixture = pretty({
+  protocol_version: 1,
+  request_id: recoveryIds.secretRequest,
+  claim_token: syntheticClaimToken,
+  device_id: heartbeatDocument.device_id,
+  recovery_id: recoveryIds.recovery,
+  vault_id: recoveryIds.vault,
+  wrapper_digest: syntheticWrapperDigest,
+});
+const recoverySecretResponseFixture = pretty({
+  protocol_version: 1,
+  request_id: recoveryIds.secretRequest,
+  data: {
+    account_id: heartbeatDocument.account_id,
+    device_id: heartbeatDocument.device_id,
+    recovery_id: recoveryIds.recovery,
+    srs: syntheticSrs,
+    vault_id: recoveryIds.vault,
+    wrapper_digest: syntheticWrapperDigest,
+  },
+});
+const recoveryProvisionForbiddenFixture = pretty({
+  ...recoveryProvision.envelope,
+  signed: {
+    ...recoveryProvisionDocument,
+    vault_content: "forbidden",
+  },
+});
+
 async function updateOrCheck(path, expected) {
   if (!checkOnly) {
     await writeFile(path, expected, "utf8");
@@ -349,6 +517,40 @@ await updateOrCheck(heartbeatForbiddenPath, heartbeatForbiddenFixture);
 await updateOrCheck(deviceStatusSignaturePath, deviceStatusSignatureFixture);
 await updateOrCheck(deviceStatusValidPath, pretty(deviceStatusEnvelope));
 await updateOrCheck(deviceStatusResponsePath, deviceStatusResponseFixture);
+await updateOrCheck(
+  recoveryProvisionSignaturePath,
+  recoveryProvision.signatureFixture,
+);
+await updateOrCheck(
+  recoveryProvisionValidPath,
+  pretty(recoveryProvision.envelope),
+);
+await updateOrCheck(
+  recoveryProvisionResponsePath,
+  recoveryProvisionResponseFixture,
+);
+await updateOrCheck(
+  recoveryConfirmSignaturePath,
+  recoveryConfirm.signatureFixture,
+);
+await updateOrCheck(recoveryConfirmValidPath, pretty(recoveryConfirm.envelope));
+await updateOrCheck(recoveryRecordResponsePath, recoveryRecordResponseFixture);
+await updateOrCheck(recoveryClaimStartPath, recoveryClaimStartFixture);
+await updateOrCheck(
+  recoveryClaimStartResponsePath,
+  recoveryClaimStartResponseFixture,
+);
+await updateOrCheck(recoveryClaimVerifyPath, recoveryClaimVerifyFixture);
+await updateOrCheck(
+  recoveryClaimVerifyResponsePath,
+  recoveryClaimVerifyResponseFixture,
+);
+await updateOrCheck(recoverySecretRequestPath, recoverySecretRequestFixture);
+await updateOrCheck(recoverySecretResponsePath, recoverySecretResponseFixture);
+await updateOrCheck(
+  recoveryProvisionForbiddenPath,
+  recoveryProvisionForbiddenFixture,
+);
 console.log(
   checkOnly
     ? "Verified generated protocol signature fixtures."

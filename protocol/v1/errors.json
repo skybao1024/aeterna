@@ -25,6 +25,12 @@
     { "code": "heartbeat.sequence_not_increasing", "http_status": 409 },
     { "code": "heartbeat.cooldown", "http_status": 429 },
     { "code": "request.idempotency_conflict", "http_status": 409 },
+    { "code": "recovery.provision_retry_required", "http_status": 409 },
+    { "code": "recovery.record_unavailable", "http_status": 409 },
+    { "code": "recovery.claim_unavailable", "http_status": 400 },
+    { "code": "recovery.otp_invalid", "http_status": 400 },
+    { "code": "recovery.otp_attempts_exhausted", "http_status": 429 },
+    { "code": "recovery.material_unavailable", "http_status": 503 },
     { "code": "service.temporarily_unavailable", "http_status": 503 }
   ]
 }

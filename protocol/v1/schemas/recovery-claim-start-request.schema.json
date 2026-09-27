@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:aeterna:protocol:v1:recovery-claim-start-request",
+  "additionalProperties": false,
+  "properties": {
+    "claim_link_token": { "$ref": "common.schema.json#/$defs/base64url32" },
+    "protocol_version": { "$ref": "common.schema.json#/$defs/protocolVersion" },
+    "request_id": { "$ref": "common.schema.json#/$defs/uuid" }
+  },
+  "required": ["claim_link_token", "protocol_version", "request_id"],
+  "type": "object"
+}

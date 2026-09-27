@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:aeterna:protocol:v1:recovery-claim-verify-request",
+  "additionalProperties": false,
+  "properties": {
+    "challenge_id": { "$ref": "common.schema.json#/$defs/uuid" },
+    "claim_link_token": { "$ref": "common.schema.json#/$defs/base64url32" },
+    "code": { "$ref": "common.schema.json#/$defs/otp8" },
+    "protocol_version": { "$ref": "common.schema.json#/$defs/protocolVersion" },
+    "request_id": { "$ref": "common.schema.json#/$defs/uuid" }
+  },
+  "required": [
+    "challenge_id",
+    "claim_link_token",
+    "code",
+    "protocol_version",
+    "request_id"
+  ],
+  "type": "object"
+}

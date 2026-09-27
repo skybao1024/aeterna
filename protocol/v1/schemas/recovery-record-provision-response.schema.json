@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:aeterna:protocol:v1:recovery-record-provision-response",
+  "additionalProperties": false,
+  "properties": {
+    "data": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": { "$ref": "common.schema.json#/$defs/uuid" },
+        "device_id": { "$ref": "common.schema.json#/$defs/uuid" },
+        "expires_at": { "$ref": "common.schema.json#/$defs/timestamp" },
+        "kms_context_version": { "const": 1, "type": "integer" },
+        "recovery_id": { "$ref": "common.schema.json#/$defs/uuid" },
+        "srs": { "$ref": "common.schema.json#/$defs/base64url32" },
+        "state": { "const": "pending_confirmation", "type": "string" },
+        "vault_id": { "$ref": "common.schema.json#/$defs/uuid" }
+      },
+      "required": [
+        "account_id",
+        "device_id",
+        "expires_at",
+        "kms_context_version",
+        "recovery_id",
+        "srs",
+        "state",
+        "vault_id"
+      ],
+      "type": "object"
+    },
+    "protocol_version": { "$ref": "common.schema.json#/$defs/protocolVersion" },
+    "request_id": { "$ref": "common.schema.json#/$defs/uuid" }
+  },
+  "required": ["protocol_version", "request_id", "data"],
+  "type": "object"
+}

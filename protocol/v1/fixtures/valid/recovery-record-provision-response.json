@@ -1,0 +1,14 @@
+{
+  "protocol_version": 1,
+  "request_id": "00000000-0000-4000-8000-000000000040",
+  "data": {
+    "account_id": "00000000-0000-4000-8000-000000000020",
+    "device_id": "00000000-0000-4000-8000-000000000003",
+    "expires_at": "2030-01-03T03:04:05Z",
+    "kms_context_version": 1,
+    "recovery_id": "00000000-0000-4000-8000-000000000041",
+    "srs": "VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVU",
+    "state": "pending_confirmation",
+    "vault_id": "00000000-0000-4000-8000-000000000042"
+  }
+}

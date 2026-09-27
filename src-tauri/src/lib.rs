@@ -5,6 +5,7 @@ mod file_panel;
 pub mod heartbeat;
 mod ipc;
 pub mod protocol;
+pub mod recovery;
 pub mod secure_storage;
 pub mod vault;
 #[cfg(target_os = "windows")]

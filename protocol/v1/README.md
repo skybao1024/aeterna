@@ -1,7 +1,8 @@
 # Aeterna public protocol v1
 
 This directory is the public, machine-readable source of truth for Aeterna I09
-account/device binding and I10 signed heartbeat/device-status operations.
+account/device binding, I10 signed heartbeat/device-status operations, and I13
+delayed-recovery record and one-time claim operations.
 Private database models, generated OpenAPI output, and desktop implementation
 types are consumers, not protocol authority.
 
@@ -35,6 +36,13 @@ domains are not interchangeable with each other or with device binding. A
 heartbeat signs only account/device routing identifiers, a request identifier,
 and a positive monotonic sequence. It contains no client time or deadline.
 
+An active bound device provisions, confirms, or abandons one recovery record
+under operation-specific signed domains. Provisioning returns a 32-byte SRS
+once; confirmation binds the local wrapper digest. A released, accepted, and
+verified contact then uses a fragment-carried claim-link token, an eight-digit
+mailbox challenge, a five-minute opaque claim token, and one exact secret-read
+operation. Secret-bearing responses require `Cache-Control: no-store`.
+
 ## Publication and compatibility
 
 `manifest.json` hashes every normative file and contains a release digest over
@@ -42,7 +50,7 @@ the RFC 8785 canonical manifest without `release_digest`. The private control
 plane vendors this exact package, pins the release tag and digest, and runs the
 same fixtures.
 
-The prepared release is `1.1.0` with tag name `protocol-v1.1.0`; preparing the
+The prepared release is `1.2.0` with tag name `protocol-v1.2.0`; preparing the
 manifest does not create or publish a Git tag. Signed field changes and security
 semantic changes require a new major/versioned operation as defined by ADR 0012. The prior major remains supported for at least 180 days after a successor
 reaches general availability, with at least 90 days' sunset notice unless a
@@ -55,5 +63,7 @@ material, request/account/device/binding identifiers, public keys, signatures,
 challenges, device state, and the minimum monotonic heartbeat sequence and
 server receipt response. Unknown fields are rejected. There is no activity
 type or observation, client timestamp or deadline, application/window/URL data,
-input value, local encrypted content, recovery secret, contact, or custom
-notification payload.
+input value, local encrypted content, contact email, or custom notification
+payload. The only recovery secret field is the purpose-limited 32-byte `srs`
+in the provisioning and released-secret success responses; it is absent from
+requests, logs, error bodies, audit fixtures, and all other operations.

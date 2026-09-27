@@ -1,0 +1,18 @@
+{
+  "protocol_version": 1,
+  "signed": {
+    "account_id": "00000000-0000-4000-8000-000000000020",
+    "canonicalization": "jcs-rfc8785",
+    "crypto_format_version": 1,
+    "device_id": "00000000-0000-4000-8000-000000000003",
+    "domain": "aeterna.recovery-record.provision.v1",
+    "operation": "recovery_record.provision",
+    "protocol_version": 1,
+    "recovery_context_version": 1,
+    "recovery_id": "00000000-0000-4000-8000-000000000041",
+    "request_id": "00000000-0000-4000-8000-000000000040",
+    "signature_version": 1,
+    "vault_id": "00000000-0000-4000-8000-000000000042"
+  },
+  "signature": "vc2mFtBKUQIuSK1ebXl0WndhKmRzImtYo12F4QVJrAkQ5RlaA320PbFKFLLJNjxKXuiB5Ao9XqmJTRo6m6NxAA"
+}

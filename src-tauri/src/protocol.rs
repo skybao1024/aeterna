@@ -1,8 +1,8 @@
 //! Public Aeterna protocol v1 types and signature canonicalization.
 //!
 //! The machine-readable source of truth lives in `protocol/v1`. These Rust
-//! types cover I09 account/device binding and the I10 signed heartbeat/device
-//! status boundary. Policy, contact, and recovery operations use later work.
+//! types cover I09 account/device binding, the I10 signed heartbeat/device
+//! status boundary, and I13 delayed-recovery record and claim operations.
 
 use core::fmt;
 
@@ -20,6 +20,9 @@ pub const DEVICE_BINDING_REQUEST_DOMAIN: &str = "aeterna.device-binding.request.
 pub const DEVICE_BINDING_APPROVAL_DOMAIN: &str = "aeterna.device-binding.approval.v1";
 pub const HEARTBEAT_SUBMIT_DOMAIN: &str = "aeterna.heartbeat.submit.v1";
 pub const DEVICE_STATUS_CHANGE_DOMAIN: &str = "aeterna.device-status.change.v1";
+pub const RECOVERY_PROVISION_DOMAIN: &str = "aeterna.recovery-record.provision.v1";
+pub const RECOVERY_CONFIRM_DOMAIN: &str = "aeterna.recovery-record.confirm.v1";
+pub const RECOVERY_ABANDON_DOMAIN: &str = "aeterna.recovery-record.abandon.v1";
 pub const MAX_PROTOCOL_BODY_BYTES: usize = 16_384;
 pub const MAX_EMAIL_BYTES: usize = 254;
 pub const MAX_DEVICE_LABEL_BYTES: usize = 64;
@@ -158,6 +161,102 @@ pub struct DeviceStatusChangeDocument {
     pub request_id: String,
     pub signature_version: u16,
     pub target_device_id: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct RecoveryRecordProvisionDocument {
+    pub account_id: String,
+    pub canonicalization: String,
+    pub crypto_format_version: u16,
+    pub device_id: String,
+    pub domain: String,
+    pub operation: String,
+    pub protocol_version: u16,
+    pub recovery_context_version: u16,
+    pub recovery_id: String,
+    pub request_id: String,
+    pub signature_version: u16,
+    pub vault_id: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct RecoveryRecordActionDocument {
+    pub account_id: String,
+    pub canonicalization: String,
+    pub device_id: String,
+    pub domain: String,
+    pub operation: String,
+    pub protocol_version: u16,
+    pub recovery_id: String,
+    pub request_id: String,
+    pub signature_version: u16,
+    pub vault_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub wrapper_digest: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct RecoveryClaimStartRequest {
+    pub protocol_version: u16,
+    pub request_id: String,
+    pub claim_link_token: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct RecoveryClaimStartData {
+    pub challenge_id: String,
+    pub expires_in_seconds: u16,
+    pub resend_after_seconds: u16,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct RecoveryClaimVerifyRequest {
+    pub protocol_version: u16,
+    pub request_id: String,
+    pub challenge_id: String,
+    pub claim_link_token: String,
+    pub code: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct RecoveryClaimData {
+    pub account_id: String,
+    pub claim_token: String,
+    pub device_id: String,
+    pub expires_at: String,
+    pub recovery_id: String,
+    pub scope: String,
+    pub vault_id: String,
+    pub wrapper_digest: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct RecoverySecretRequest {
+    pub protocol_version: u16,
+    pub request_id: String,
+    pub claim_token: String,
+    pub device_id: String,
+    pub recovery_id: String,
+    pub vault_id: String,
+    pub wrapper_digest: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct RecoverySecretData {
+    pub account_id: String,
+    pub device_id: String,
+    pub recovery_id: String,
+    pub srs: String,
+    pub vault_id: String,
+    pub wrapper_digest: String,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -448,6 +547,77 @@ pub fn validate_device_status_change(
     Ok(())
 }
 
+pub fn validate_recovery_provision(
+    document: &RecoveryRecordProvisionDocument,
+) -> Result<(), ProtocolError> {
+    validate_signed_header(
+        SignedHeaderRef::from_recovery_provision(document),
+        RECOVERY_PROVISION_DOMAIN,
+        "recovery_record.provision",
+    )?;
+    for value in [
+        &document.account_id,
+        &document.device_id,
+        &document.recovery_id,
+        &document.vault_id,
+    ] {
+        validate_uuid(value)?;
+    }
+    if document.crypto_format_version != 1 || document.recovery_context_version != 1 {
+        return Err(ProtocolError::UnsupportedProtocolVersion);
+    }
+    Ok(())
+}
+
+pub fn validate_recovery_action(
+    document: &RecoveryRecordActionDocument,
+) -> Result<(), ProtocolError> {
+    let (domain, operation, needs_digest) = match document.operation.as_str() {
+        "recovery_record.confirm" => (RECOVERY_CONFIRM_DOMAIN, "recovery_record.confirm", true),
+        "recovery_record.abandon" => (RECOVERY_ABANDON_DOMAIN, "recovery_record.abandon", false),
+        _ => return Err(ProtocolError::UnsupportedOperation),
+    };
+    validate_signed_header(
+        SignedHeaderRef::from_recovery_action(document),
+        domain,
+        operation,
+    )?;
+    for value in [
+        &document.account_id,
+        &document.device_id,
+        &document.recovery_id,
+        &document.vault_id,
+    ] {
+        validate_uuid(value)?;
+    }
+    match (&document.wrapper_digest, needs_digest) {
+        (Some(value), true) => {
+            decode_exact::<32>(value)?;
+            Ok(())
+        }
+        (None, false) => Ok(()),
+        _ => Err(ProtocolError::InvalidBase64Url),
+    }
+}
+
+pub fn validate_recovery_secret_data(data: &RecoverySecretData) -> Result<(), ProtocolError> {
+    for value in [
+        &data.account_id,
+        &data.device_id,
+        &data.recovery_id,
+        &data.vault_id,
+    ] {
+        validate_uuid(value)?;
+    }
+    decode_exact::<32>(&data.wrapper_digest)?;
+    decode_exact::<32>(&data.srs)?;
+    Ok(())
+}
+
+pub fn decode_base64url_32(encoded: &str) -> Result<[u8; 32], ProtocolError> {
+    decode_exact(encoded)
+}
+
 struct SignedHeaderRef<'a> {
     protocol_version: u16,
     signature_version: u16,
@@ -503,6 +673,28 @@ impl<'a> SignedHeaderRef<'a> {
     }
 
     fn from_device_status_change(document: &'a DeviceStatusChangeDocument) -> Self {
+        Self {
+            protocol_version: document.protocol_version,
+            signature_version: document.signature_version,
+            canonicalization: &document.canonicalization,
+            domain: &document.domain,
+            operation: &document.operation,
+            request_id: &document.request_id,
+        }
+    }
+
+    fn from_recovery_provision(document: &'a RecoveryRecordProvisionDocument) -> Self {
+        Self {
+            protocol_version: document.protocol_version,
+            signature_version: document.signature_version,
+            canonicalization: &document.canonicalization,
+            domain: &document.domain,
+            operation: &document.operation,
+            request_id: &document.request_id,
+        }
+    }
+
+    fn from_recovery_action(document: &'a RecoveryRecordActionDocument) -> Self {
         Self {
             protocol_version: document.protocol_version,
             signature_version: document.signature_version,
@@ -650,6 +842,79 @@ mod tests {
         canonical_bytes: String,
         signature: String,
         document: DeviceStatusChangeDocument,
+    }
+
+    #[derive(Deserialize)]
+    #[serde(deny_unknown_fields)]
+    struct RecoveryProvisionSignatureFixture {
+        fixture_version: u16,
+        seed: String,
+        public_key: String,
+        canonical_bytes: String,
+        signature: String,
+        document: RecoveryRecordProvisionDocument,
+    }
+
+    #[derive(Deserialize)]
+    #[serde(deny_unknown_fields)]
+    struct RecoveryActionSignatureFixture {
+        fixture_version: u16,
+        seed: String,
+        public_key: String,
+        canonical_bytes: String,
+        signature: String,
+        document: RecoveryRecordActionDocument,
+    }
+
+    #[test]
+    fn recovery_record_signature_fixtures_match_and_validate() {
+        let provision: RecoveryProvisionSignatureFixture = serde_json::from_str(include_str!(
+            "../../protocol/v1/fixtures/signatures/recovery-record-provision.json"
+        ))
+        .expect("recovery provision fixture should parse");
+        assert_eq!(provision.fixture_version, 1);
+        assert_eq!(decode_exact::<32>(&provision.seed), Ok([0x11; 32]));
+        validate_recovery_provision(&provision.document).expect("provision should validate");
+        let public = decode_public_key(&provision.public_key).expect("public key should decode");
+        let canonical = canonical_bytes(&provision.document).expect("JCS should succeed");
+        assert_eq!(URL_SAFE_NO_PAD.encode(canonical), provision.canonical_bytes);
+        assert_eq!(
+            verify_document(&public, &provision.document, &provision.signature),
+            Ok(())
+        );
+
+        let confirm: RecoveryActionSignatureFixture = serde_json::from_str(include_str!(
+            "../../protocol/v1/fixtures/signatures/recovery-record-confirm.json"
+        ))
+        .expect("recovery confirm fixture should parse");
+        assert_eq!(confirm.fixture_version, 1);
+        assert_eq!(decode_exact::<32>(&confirm.seed), Ok([0x11; 32]));
+        validate_recovery_action(&confirm.document).expect("confirm should validate");
+        assert_eq!(confirm.public_key, provision.public_key);
+        let canonical = canonical_bytes(&confirm.document).expect("JCS should succeed");
+        assert_eq!(URL_SAFE_NO_PAD.encode(canonical), confirm.canonical_bytes);
+        assert_eq!(
+            verify_document(&public, &confirm.document, &confirm.signature),
+            Ok(())
+        );
+    }
+
+    #[test]
+    fn recovery_secret_fixture_is_closed_and_exactly_bound() {
+        let response: SuccessResponse<RecoverySecretData> = serde_json::from_str(include_str!(
+            "../../protocol/v1/fixtures/valid/recovery-secret-response.json"
+        ))
+        .expect("recovery secret response should parse");
+        assert_eq!(response.protocol_version, 1);
+        assert_eq!(validate_recovery_secret_data(&response.data), Ok(()));
+
+        let invalid = include_str!(
+            "../../protocol/v1/fixtures/invalid/recovery-record-provision-forbidden-data.json"
+        );
+        assert!(
+            serde_json::from_str::<SignedEnvelope<RecoveryRecordProvisionDocument>>(invalid)
+                .is_err()
+        );
     }
 
     #[test]

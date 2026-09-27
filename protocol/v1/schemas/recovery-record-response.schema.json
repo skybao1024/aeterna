@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:aeterna:protocol:v1:recovery-record-response",
+  "additionalProperties": false,
+  "properties": {
+    "data": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": { "$ref": "common.schema.json#/$defs/uuid" },
+        "device_id": { "$ref": "common.schema.json#/$defs/uuid" },
+        "recovery_id": { "$ref": "common.schema.json#/$defs/uuid" },
+        "state": { "$ref": "common.schema.json#/$defs/recoveryRecordState" },
+        "updated_at": { "$ref": "common.schema.json#/$defs/timestamp" },
+        "vault_id": { "$ref": "common.schema.json#/$defs/uuid" }
+      },
+      "required": [
+        "account_id",
+        "device_id",
+        "recovery_id",
+        "state",
+        "updated_at",
+        "vault_id"
+      ],
+      "type": "object"
+    },
+    "protocol_version": { "$ref": "common.schema.json#/$defs/protocolVersion" },
+    "request_id": { "$ref": "common.schema.json#/$defs/uuid" }
+  },
+  "required": ["protocol_version", "request_id", "data"],
+  "type": "object"
+}

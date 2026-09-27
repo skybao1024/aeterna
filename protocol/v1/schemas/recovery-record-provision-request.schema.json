@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:aeterna:protocol:v1:recovery-record-provision-request",
+  "additionalProperties": false,
+  "properties": {
+    "protocol_version": { "$ref": "common.schema.json#/$defs/protocolVersion" },
+    "signed": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": { "$ref": "common.schema.json#/$defs/uuid" },
+        "canonicalization": {
+          "$ref": "common.schema.json#/$defs/canonicalization"
+        },
+        "crypto_format_version": { "const": 1, "type": "integer" },
+        "device_id": { "$ref": "common.schema.json#/$defs/uuid" },
+        "domain": {
+          "const": "aeterna.recovery-record.provision.v1",
+          "type": "string"
+        },
+        "operation": { "const": "recovery_record.provision", "type": "string" },
+        "protocol_version": {
+          "$ref": "common.schema.json#/$defs/protocolVersion"
+        },
+        "recovery_context_version": { "const": 1, "type": "integer" },
+        "recovery_id": { "$ref": "common.schema.json#/$defs/uuid" },
+        "request_id": { "$ref": "common.schema.json#/$defs/uuid" },
+        "signature_version": {
+          "$ref": "common.schema.json#/$defs/signatureVersion"
+        },
+        "vault_id": { "$ref": "common.schema.json#/$defs/uuid" }
+      },
+      "required": [
+        "account_id",
+        "canonicalization",
+        "crypto_format_version",
+        "device_id",
+        "domain",
+        "operation",
+        "protocol_version",
+        "recovery_context_version",
+        "recovery_id",
+        "request_id",
+        "signature_version",
+        "vault_id"
+      ],
+      "type": "object"
+    },
+    "signature": { "$ref": "common.schema.json#/$defs/base64url64" }
+  },
+  "required": ["protocol_version", "signed", "signature"],
+  "type": "object"
+}
