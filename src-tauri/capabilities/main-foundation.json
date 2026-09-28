@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "main-foundation",
-  "description": "Allows the main local window to call only the narrow local-vault and I07 transfer commands.",
+  "description": "Allows the main local window to call only the narrow local-vault, transfer, and I08 lifecycle commands and receive native close requests.",
   "windows": ["main"],
   "permissions": [
     "allow-vault-status",
@@ -23,6 +23,13 @@
     "allow-vault-import-choose",
     "allow-vault-import-start",
     "allow-vault-transfer-status",
-    "allow-vault-transfer-cancel"
+    "allow-vault-transfer-cancel",
+    "allow-lifecycle-status",
+    "allow-lifecycle-set-autostart",
+    "allow-lifecycle-request-notification-permission",
+    "allow-lifecycle-set-locale",
+    "allow-lifecycle-reset-health-state",
+    "core:event:allow-listen",
+    "core:event:allow-unlisten"
   ]
 }

@@ -13,7 +13,7 @@ use std::{
 use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
 
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
-use tauri::{State, ipc::InvokeBody};
+use tauri::{AppHandle, State, ipc::InvokeBody};
 use zeroize::Zeroizing;
 
 use crate::{
@@ -208,6 +208,39 @@ impl VaultAppState {
             .lock()
             .map_err(|_| IpcError::from(VaultError::Internal))
     }
+
+    #[cfg(target_os = "macos")]
+    pub(crate) fn is_unlocked_for_lifecycle(&self) -> bool {
+        self.inner
+            .lock()
+            .is_ok_and(|inner| matches!(inner.session, SessionState::Unlocked { .. }))
+    }
+
+    #[cfg(target_os = "macos")]
+    pub(crate) fn secure_lock_for_lifecycle(&self) -> Result<(), ()> {
+        let handle = {
+            let mut inner = self.inner.lock().map_err(|_| ())?;
+            inner.pending_upload = None;
+            inner.selection = None;
+            inner.session_epoch = inner.session_epoch.wrapping_add(1);
+            let replacement = match &inner.session {
+                SessionState::Unlocked { repository, .. } => Some(repository.clone()),
+                _ => None,
+            };
+            if let Some(repository) = replacement {
+                inner.session = SessionState::Locked(repository);
+            }
+            inner.transfer.as_mut().and_then(|transfer| {
+                transfer.reporter.cancel.store(true, Ordering::Release);
+                transfer.reporter.update("cancelling", 0, 0, false);
+                transfer.handle.take()
+            })
+        };
+        if let Some(handle) = handle {
+            handle.join().map_err(|_| ())?;
+        }
+        Ok(())
+    }
 }
 
 #[derive(Debug, Eq, PartialEq, Serialize)]
@@ -231,6 +264,13 @@ impl From<TransferError> for IpcError {
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct EmptyRequest {}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct LockRequest {
+    #[serde(default)]
+    close_window: bool,
+}
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -537,12 +577,20 @@ fn vault_unlock_impl(body: &InvokeBody, state: &VaultAppState) -> Result<StatusR
 pub(crate) fn vault_lock(
     request: tauri::ipc::Request<'_>,
     state: State<'_, VaultAppState>,
+    app: AppHandle,
 ) -> Result<StatusResponse, IpcError> {
-    vault_lock_impl(request.body(), state.inner())
+    let request = parse_json::<LockRequest>(request.body())?;
+    let response = vault_lock_impl(state.inner())?;
+    #[cfg(target_os = "macos")]
+    if request.close_window {
+        crate::lifecycle::runtime::hide_main_window_after_lock(&app);
+    }
+    #[cfg(not(target_os = "macos"))]
+    let _ = (app, request);
+    Ok(response)
 }
 
-fn vault_lock_impl(body: &InvokeBody, state: &VaultAppState) -> Result<StatusResponse, IpcError> {
-    parse_json::<EmptyRequest>(body)?;
+fn vault_lock_impl(state: &VaultAppState) -> Result<StatusResponse, IpcError> {
     let mut inner = state.lock()?;
     let replacement = match &inner.session {
         SessionState::Uninitialized => return Err(VaultError::Uninitialized.into()),
@@ -1611,6 +1659,16 @@ mod tests {
 
     #[test]
     fn strict_request_schemas_reject_missing_extra_and_wrong_types() {
+        assert!(
+            parse_json::<LockRequest>(&json_body(json!({ "closeWindow": true })))
+                .is_ok_and(|request| request.close_window)
+        );
+        assert!(
+            parse_json::<LockRequest>(&json_body(json!({})))
+                .is_ok_and(|request| !request.close_window)
+        );
+        assert!(parse_json::<LockRequest>(&json_body(json!({ "closeWindow": "yes" }))).is_err());
+        assert!(parse_json::<LockRequest>(&json_body(json!({ "extra": true }))).is_err());
         let valid = serde_json::from_str::<ItemDraftRequest>(
             r#"{"kind":"note","title":"Synthetic","category":"","contactExplanation":"","body":""}"#,
         );
@@ -2020,7 +2078,7 @@ mod tests {
             });
         }
         assert_eq!(
-            json_result(vault_lock_impl(&json_body(json!({})), &state)),
+            json_result(vault_lock_impl(&state)),
             Ok(json!({ "state": "locked" }))
         );
         {

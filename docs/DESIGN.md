@@ -339,6 +339,14 @@ but no heartbeat succeeds for more than 24 hours, it must show a tray error and
 a local system notification. Local observation cannot replace a server
 heartbeat or extend the server deadline.
 
+Before this native activity agent is bound to account/device identity and signed delivery, the desktop reports
+the service facet as unbound, keeps `last_successful_heartbeat_at` absent, and
+does not synthesize stale-service notifications. Only an authenticated,
+server-accepted response may update that field. The local lifecycle health
+record may persist desired Login Item state, UI locale, bounded notification
+rate-limit state, format generation, and save time; it never persists a local
+activity timestamp or candidate.
+
 ### 6.4 Platform implementation
 
 - Windows: session login/lock/unlock events plus current-session input age.
@@ -1111,7 +1119,11 @@ fuzzing, and penetration review before release. 禁止使用已弃用的
   production signing, container, migration, recovery UX, and audit evidence are
   not falsely claimed complete in Phase 0.
 
-### Phase 1 — 本地 Vault MVP
+### Phase 1 — Local vault foundation
+
+This is a component milestone, not a user-visible product MVP. The product MVP
+requires the desktop, control plane, notifications, and local recovery to work
+together as defined in [MVP_DELIVERY_PLAN.md](./MVP_DELIVERY_PLAN.md).
 
 - Vault Engine、主密码和本地附件。
 - 加密导入/导出。

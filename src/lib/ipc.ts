@@ -3,6 +3,12 @@ import { invoke } from "@tauri-apps/api/core";
 export const MAX_ATTACHMENT_BYTES = 786_432;
 
 export type VaultState = "uninitialized" | "locked" | "unlocked";
+export type LifecycleService =
+  "unbound" | "not_configured" | "healthy" | "stale";
+export type LifecycleActivity = "ready" | "gate_unavailable" | "agent_error";
+export type AutostartState = "enabled" | "disabled" | "drifted" | "unavailable";
+export type NotificationState =
+  "not_requested" | "authorized" | "denied" | "unavailable";
 export type ItemKind = "note" | "instruction";
 export type TransferKind = "export" | "import";
 export type TransferState =
@@ -42,6 +48,18 @@ export interface ItemDraft {
   category: string;
   contactExplanation: string;
   body: string;
+}
+
+export interface LifecycleStatus {
+  service: LifecycleService;
+  activity: LifecycleActivity;
+  autostart: AutostartState;
+  autostartDesired: boolean;
+  notifications: NotificationState;
+  locale: "en" | "zh-CN";
+  lastServerAcceptedAtMs?: string;
+  healthResetRequired: boolean;
+  canRequestNotifications: boolean;
 }
 
 export interface AttachmentDescriptor {
@@ -96,8 +114,40 @@ export async function unlockVault(password: string): Promise<void> {
   await expectStateResponse("vault_unlock", { password }, "unlocked");
 }
 
-export async function lockVault(): Promise<void> {
-  await expectStateResponse("vault_lock", {}, "locked");
+export async function lockVault(closeWindow = false): Promise<void> {
+  await expectStateResponse("vault_lock", { closeWindow }, "locked");
+}
+
+export async function getLifecycleStatus(): Promise<LifecycleStatus> {
+  return parseLifecycleStatus(await invokeSafely("lifecycle_status", {}));
+}
+
+export async function setLifecycleAutostart(
+  enabled: boolean,
+): Promise<LifecycleStatus> {
+  return parseLifecycleStatus(
+    await invokeSafely("lifecycle_set_autostart", { enabled }),
+  );
+}
+
+export async function requestLifecycleNotificationPermission(): Promise<LifecycleStatus> {
+  return parseLifecycleStatus(
+    await invokeSafely("lifecycle_request_notification_permission", {}),
+  );
+}
+
+export async function setLifecycleLocale(
+  locale: "en" | "zh-CN",
+): Promise<LifecycleStatus> {
+  return parseLifecycleStatus(
+    await invokeSafely("lifecycle_set_locale", { locale }),
+  );
+}
+
+export async function resetLifecycleHealthState(): Promise<LifecycleStatus> {
+  return parseLifecycleStatus(
+    await invokeSafely("lifecycle_reset_health_state", {}),
+  );
 }
 
 export async function chooseVaultExport(): Promise<FileSelection> {
@@ -319,6 +369,34 @@ function parseItemEnvelope(value: unknown): VaultItem {
     throw new VaultIpcError("ipc_invalid_response");
   }
   return value.item;
+}
+
+function parseLifecycleStatus(value: unknown): LifecycleStatus {
+  if (!isRecord(value)) throw new VaultIpcError("ipc_invalid_response");
+  const service = ["unbound", "not_configured", "healthy", "stale"];
+  const activity = ["ready", "gate_unavailable", "agent_error"];
+  const autostart = ["enabled", "disabled", "drifted", "unavailable"];
+  const notifications = [
+    "not_requested",
+    "authorized",
+    "denied",
+    "unavailable",
+  ];
+  if (
+    !service.includes(String(value.service)) ||
+    !activity.includes(String(value.activity)) ||
+    !autostart.includes(String(value.autostart)) ||
+    !notifications.includes(String(value.notifications)) ||
+    typeof value.autostartDesired !== "boolean" ||
+    (value.locale !== "en" && value.locale !== "zh-CN") ||
+    (value.lastServerAcceptedAtMs !== undefined &&
+      !isNonnegativeDecimal(value.lastServerAcceptedAtMs)) ||
+    typeof value.healthResetRequired !== "boolean" ||
+    typeof value.canRequestNotifications !== "boolean"
+  ) {
+    throw new VaultIpcError("ipc_invalid_response");
+  }
+  return value as unknown as LifecycleStatus;
 }
 
 function normalizeInvokeError(error: unknown): VaultIpcError {

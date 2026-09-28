@@ -2,7 +2,7 @@
   "app": {
     "brand": "Aeterna",
     "windowTitle": "Aeterna local vault preview",
-    "previewLabel": "I07 local development preview"
+    "previewLabel": "Local vault development preview"
   },
   "locale": {
     "label": "Language",
@@ -178,6 +178,48 @@
     "vault_unsupported_version": "The local vault uses an unsupported version.",
     "vault_upload_not_found": "The attachment transfer expired, was cancelled, or was already used.",
     "vault_upload_pending": "Finish or cancel the current attachment transfer first.",
-    "generic": "The operation could not be completed safely."
+    "generic": "The operation could not be completed safely.",
+    "lifecycle_autostart_failed": "The Login Item setting could not be changed.",
+    "lifecycle_health_reset_failed": "The local health state could not be reset safely.",
+    "lifecycle_health_reset_required": "Reset the invalid local health state before changing lifecycle settings.",
+    "lifecycle_health_write_failed": "The local health state could not be saved safely.",
+    "lifecycle_internal": "The lifecycle state is temporarily unavailable.",
+    "lifecycle_invalid_locale": "That language is not supported.",
+    "lifecycle_invalid_request": "The lifecycle request was rejected.",
+    "lifecycle_stopping": "Aeterna is shutting down and cannot change lifecycle settings.",
+    "lifecycle_user_gesture_required": "Use the visible Aeterna window to change this setting."
+  },
+  "lifecycle": {
+    "heading": "Background health",
+    "enableAutostart": "Launch at login",
+    "disableAutostart": "Stop launching at login",
+    "openLoginItems": "Open Login Items",
+    "enableNotifications": "Enable notifications",
+    "resetHealth": "Reset health state",
+    "resetTitle": "Reset local health state?",
+    "resetDescription": "This replaces only Aeterna's bounded lifecycle-health record. Vault content and server history are not changed.",
+    "service": {
+      "unbound": "Service not connected",
+      "not_configured": "Service not configured",
+      "healthy": "Service healthy",
+      "stale": "Service stale"
+    },
+    "activity": {
+      "ready": "Activity agent ready",
+      "gate_unavailable": "Activity gate unavailable",
+      "agent_error": "Activity agent needs attention"
+    },
+    "autostart": {
+      "enabled": "Launch at login enabled",
+      "disabled": "Launch at login disabled",
+      "drifted": "Login Item needs review",
+      "unavailable": "Login Item unavailable"
+    },
+    "notifications": {
+      "not_requested": "Notifications not requested",
+      "authorized": "Notifications authorized",
+      "denied": "Notifications denied",
+      "unavailable": "Notifications unavailable"
+    }
   }
 }

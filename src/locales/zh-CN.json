@@ -2,7 +2,7 @@
   "app": {
     "brand": "Aeterna",
     "windowTitle": "Aeterna 本地保险箱预览",
-    "previewLabel": "I07 本地开发预览"
+    "previewLabel": "本地保险箱开发预览"
   },
   "locale": {
     "label": "语言",
@@ -178,6 +178,48 @@
     "vault_unsupported_version": "本地保险箱使用了不受支持的版本。",
     "vault_upload_not_found": "附件传输已过期、已取消或已被使用。",
     "vault_upload_pending": "请先完成或取消当前附件传输。",
-    "generic": "无法安全完成此操作。"
+    "generic": "无法安全完成此操作。",
+    "lifecycle_autostart_failed": "无法更改登录项设置。",
+    "lifecycle_health_reset_failed": "无法安全重置本地健康状态。",
+    "lifecycle_health_reset_required": "请先重置无效的本地健康状态，再更改生命周期设置。",
+    "lifecycle_health_write_failed": "无法安全保存本地健康状态。",
+    "lifecycle_internal": "生命周期状态暂时不可用。",
+    "lifecycle_invalid_locale": "不支持该语言。",
+    "lifecycle_invalid_request": "生命周期请求已被拒绝。",
+    "lifecycle_stopping": "Aeterna 正在退出，无法更改生命周期设置。",
+    "lifecycle_user_gesture_required": "请在可见的 Aeterna 窗口中更改此设置。"
+  },
+  "lifecycle": {
+    "heading": "后台健康状态",
+    "enableAutostart": "登录时启动",
+    "disableAutostart": "停止登录时启动",
+    "openLoginItems": "打开登录项设置",
+    "enableNotifications": "启用通知",
+    "resetHealth": "重置健康状态",
+    "resetTitle": "重置本地健康状态？",
+    "resetDescription": "这只会替换 Aeterna 的有限生命周期健康记录，不会更改保险箱内容或服务器历史。",
+    "service": {
+      "unbound": "服务未连接",
+      "not_configured": "服务未配置",
+      "healthy": "服务正常",
+      "stale": "服务状态已过期"
+    },
+    "activity": {
+      "ready": "活动代理已就绪",
+      "gate_unavailable": "活动门控不可用",
+      "agent_error": "活动代理需要处理"
+    },
+    "autostart": {
+      "enabled": "已启用登录时启动",
+      "disabled": "已停用登录时启动",
+      "drifted": "登录项需要检查",
+      "unavailable": "登录项不可用"
+    },
+    "notifications": {
+      "not_requested": "尚未请求通知权限",
+      "authorized": "通知已获授权",
+      "denied": "通知已被拒绝",
+      "unavailable": "通知不可用"
+    }
   }
 }

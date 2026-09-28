@@ -21,6 +21,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             "vault_import_start",
             "vault_transfer_status",
             "vault_transfer_cancel",
+            "lifecycle_status",
+            "lifecycle_set_autostart",
+            "lifecycle_request_notification_permission",
+            "lifecycle_set_locale",
+            "lifecycle_reset_health_state",
         ]),
     ))?;
     Ok(())

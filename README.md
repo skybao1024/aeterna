@@ -1,11 +1,13 @@
 # Aeterna desktop client
 
-Aeterna is a local-first desktop application. This repository contains the I00
-Tauri/React engineering foundation, development-only I01/I04 platform activity
-probes, I02/I04 cryptography and secure-storage risk prototypes, the accepted
-I05 encrypted SQLite record store, and the I06 local vault-item workflow. It
-does not implement production activity detection, recovery, backup/export,
-device registration, synchronization, or network services.
+Aeterna is a local-first desktop application. The repository contains the
+encrypted local vault and export/import workflow, macOS activity and lifecycle
+implementation in progress, and versioned account, heartbeat, and recovery
+protocol/core modules. The current desktop runtime does not yet connect these
+modules into a complete account-to-heartbeat-to-recovery journey. The
+[MVP delivery plan](docs/MVP_DELIVERY_PLAN.md) defines the remaining development
+work, while [DEVELOPMENT_PLAN.md](docs/DEVELOPMENT_PLAN.md) retains historical
+iteration evidence. This build is not a verified or production-ready MVP.
 
 The application identifier is `dev.aeterna.desktop.foundation`. It is
 explicitly development-only and does not reserve a production signing identity.
@@ -125,7 +127,7 @@ key:
 
 ```sh
 cargo run --manifest-path src-tauri/Cargo.toml \
-  --release --bin i02_argon2_benchmark -- A
+  --release --features engineering-tools --bin i02_argon2_benchmark -- A
 ```
 
 The manual Keychain probe accepts only a fixed action name and generates its
@@ -133,7 +135,7 @@ synthetic signing key internally:
 
 ```sh
 cargo run --manifest-path src-tauri/Cargo.toml \
-  --bin i02_keychain_probe -- create
+  --features engineering-tools --bin i02_keychain_probe -- create
 ```
 
 I02 is Accepted. The profile-signed macOS real-machine matrix passed create,
@@ -153,7 +155,7 @@ identity, replace, typed metadata, lock observation, and idempotent cleanup:
 
 ```powershell
 cargo run --manifest-path src-tauri/Cargo.toml `
-  --bin i04_windows_credential_probe -- create
+  --features engineering-tools --bin i04_windows_credential_probe -- create
 ```
 
 The activity-prototype executable manages only the temporary current-user Run

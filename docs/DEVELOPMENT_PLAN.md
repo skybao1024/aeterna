@@ -2,20 +2,22 @@
 
 > Planning baseline: 2026-09-20  
 > Product source of truth: [`DESIGN.md`](./DESIGN.md)  
+> Active MVP build sequence and completion definition: [`MVP_DELIVERY_PLAN.md`](./MVP_DELIVERY_PLAN.md)
 > Repositories: public desktop client (`aeterna`) and private hosted control plane (`aeterna-control-plane`)
 
 ## 1. Purpose
 
-This plan turns the product design into a sequence of small, independently
-verifiable development iterations. It is intentionally separate from
-`AGENTS.md`: this document may change as evidence is collected, while
-`AGENTS.md` contains durable engineering rules.
+This plan retains the I00-I16 scopes, decisions, and evidence as a historical
+iteration ledger. It is intentionally separate from `AGENTS.md`, which contains
+durable engineering rules. An `Accepted` component iteration proves only its
+declared exit criteria, not a complete desktop-to-service user journey.
 
-The project uses one active implementation iteration at a time. A later
-iteration may be prepared, but it must not start source changes until its
-declared dependencies are accepted. Each iteration should normally run in a
-fresh Codex task so that its scope, evidence, and completion boundary remain
-clear.
+The active forward development order, MVP definition, and validation gates are
+in [`MVP_DELIVERY_PLAN.md`](./MVP_DELIVERY_PLAN.md). In particular, I08's
+remaining native qualification does not block ordinary runtime integration;
+it still blocks the macOS release-readiness gate. Work from a reviewed,
+recoverable code checkpoint and avoid concurrent writers in the same checkout.
+G1 is not the next implementation task.
 
 ## 2. Repository ownership
 
@@ -45,8 +47,9 @@ Every implementation task must follow this lifecycle:
 5. Run repository-native formatting, linting, type checks, tests, and builds.
 6. Compare the changed files and observed behavior with every acceptance
    criterion.
-7. Update this plan with evidence and remaining risks. Do not mark an iteration
-   complete when a required platform or integration check was skipped.
+7. Update the relevant plan with evidence and remaining risks. Do not mark an
+   iteration complete when one of *its own* required checks was skipped; do not
+   import a later release gate into a development slice.
 
 An implementation session must not weaken an acceptance criterion, delete a
 failing test, or broaden a security boundary to make the iteration pass. A
@@ -70,7 +73,7 @@ waive those criteria or unblock a dependent gate.
 | I05 | Versioned vault format and encrypted storage core    | Client     | G0                                                  | Local encrypted records survive restart and tampering is rejected                    | Accepted |
 | I06 | Vault item and bounded-attachment MVP                | Client     | I05                                                 | User can create, edit, read, and delete encrypted local content                      | Accepted |
 | I07 | Atomic encrypted export and import                   | Client     | I05-I06                                             | Interruption and tampering tests pass; restored vault matches source                 | Accepted |
-| I08 | macOS lifecycle, activity agent, and hardening       | Client     | G0, I01, I05-I07                                    | macOS autostart, tray health, CSP, capabilities, and i18n acceptance pass            | Stopped |
+| I08 | macOS lifecycle, activity agent, and hardening       | Client     | G0, I01, I05-I07                                    | macOS autostart, tray health, CSP, capabilities, and i18n acceptance pass            | In Progress |
 | GW  | Windows platform qualification gate                 | Client     | I04; application core available for Windows testing | Real-Windows matrices pass; ADR 0003 approved or redesigned; no unqualified release  | Pending |
 | I09 | Public protocol v1 and account/device binding        | Both       | G0                                                  | Versioned schemas and fixtures drive client and server contract tests                | Accepted |
 | I10 | Signed heartbeat and multi-device aggregation        | Both       | I09                                                 | Replay, revocation, stale-device, and concurrent-device tests pass                   | Accepted |
@@ -244,13 +247,19 @@ gates rather than I07 acceptance substitutes.
 
 ### I08 — macOS lifecycle, activity agent, and hardening
 
-Work stopped without acceptance on 2026-09-27. The implementation and result
-record are preserved at commit `090912f` on `codex/i08-stopped-checkpoint`, with
-macOS lifecycle ADR 0011. The current-host Keychain gate passed its signed
-startup check, but the remaining native matrices and macOS 15 floor evidence
-are incomplete. The exact synthetic Keychain gate also remains after its narrow
-delete probe failed. I09 depends on G0 and may proceed independently; I08 must
-still be accepted before G1.
+Work resumed on 2026-09-28 from preserved commit `090912f` on
+`codex/i08-stopped-checkpoint`. Its approved implementation is reconciled with
+the accepted I09-I14 client baseline on `main`. The integrated revision passes
+canonical repository checks, an unsigned host build, signed startup on both
+the current host and a distinct Apple Silicon macOS 15.5 MacBook, standard-path
+Login Item registration and rollback, exact Argon2 replay under synthetic
+pressure, and current-host 15-minute CPU/RSS targets. The owner accepted a
+30/minute named-agent wakeup limit while preserving five-second gate checks;
+short retained trace segments meet it, but a continuous 15-minute named-thread
+count is still missing. The exact synthetic Keychain gate was deleted and
+verified absent on both hosts at the recorded checkpoint, but later app launches
+require final cleanup. The remaining native behavior and cleanup matrix is
+incomplete. I08 is not accepted, and G1 must wait for its complete evidence.
 
 Turn the accepted macOS prototypes into production components. Add autostart,
 bounded heartbeat scheduling inputs, last-success health state, tray warning,
@@ -334,6 +343,11 @@ after release or claim. Test interrupted rotation and partial-device states.
 
 ### G1 — macOS v1 security and recovery-readiness gate
 
+G1 follows the MVP development and staging-validation sequence in
+[`MVP_DELIVERY_PLAN.md`](./MVP_DELIVERY_PLAN.md), plus final I08 native
+qualification. The table above preserves the original component dependencies
+but is not a claim that I05-I14 acceptance alone makes G1 ready.
+
 Require independent cryptographic review, desktop penetration testing, dependency
 and license review, fuzzing of containers/import/IPC, clean-device installation,
 two-copy restoration, control-plane backup restoration, and a full release/claim
@@ -416,4 +430,4 @@ evidence.
 - 2026-09-27: I11 accepted in the current task after implementation and verification of server ADR 0002. The private service now binds each policy one-to-one to its account, serializes signed heartbeat and release work in account-then-policy lock order, implements the closed `ACTIVE`, `PRE_WARNING`, `GRACE_PERIOD`, `RELEASED`, `DISABLED`, and `DELETED` graph, uses replaceable UTC server time and inclusive policy boundaries, atomically cancels warning/release intents on valid heartbeat, and records state plus provider-neutral notification intent in one transaction. Stable database keys cover repeated scheduler runs, queue attempts, and callbacks; queued or acknowledged Outbox state never becomes warning-delivery proof. Outage recovery clears prior proof and restarts a complete grace interval, while `RELEASED` remains irreversible and no I12 provider/contact or I13 SRS/claim behavior was added. The focused PostgreSQL matrix passed 23 tests including timing, no-proof recovery, both lock winners, duplicate work, rollback, callback conflict, disable/delete, and terminal replay; the complete Dockerized backend suite passed 65 tests. Migration `6b8f7d4a91c2` passed upgrade/downgrade/re-upgrade plus Alembic current/check, both tasks were registered and executed by the live Celery worker, focused Black/isort/Flake8 and repository critical Flake8 passed. I08 remains stopped and was not used as native evidence. I12 is next eligible.
 - 2026-09-27: I12 accepted for the fail-closed engineering boundary. The private service implements encrypted Notification Targets and templates, confirm-now and private-until-release disclosure, neutral short-lived invitations, explicit accept/decline and mailbox verification, confirmed-contact tests, deletion and keyed suppression, abuse limits, redacted audit, I11 notification materialization, stable email Outbox authorization, transport-only delivery state, and cancellation without granting recovery authority. AWS SES v2 is the selected production adapter; it uses simple content, fixed sender/configuration, the standard IAM credential chain, one SDK attempt, and never retries an ambiguous send because SES has no cross-request idempotency token. Exact-topic SNS SignatureVersion 2 callbacks verify a Region-bound AWS certificate and RSA/SHA-256 signature, handle send/delivery/bounce/complaint/rejection idempotently, and ignore open/click tracking. The focused matrix passed 21 tests, including concurrent send and callback races; the complete Dockerized backend suite passed 86 tests. Migration `b1e89ccdb30a` passed current/check, downgrade/re-upgrade, and a second current/check; seven client OpenAPI operations, the hidden POST-only callback route, three live Celery registrations, dependency consistency, focused format/lint, repository critical Flake8, and focused Bandit checks passed. No AWS request or real email was sent, as explicitly deferred. Production remains disabled and fail closed until Region, sender, jurisdiction, policy, retention, and live-send launch gates are approved. I13 is next eligible subject to its KMS/crypto prerequisite.
 - 2026-09-27: I13 accepted after explicit approval of ADR 0014, the cost-controlled single-Region KMS design, and SES delivery of the recovery link and OTP. Prepared protocol v1.2.0 is bound by digest `456335ec6baf6f7161aa715263943427402ff675606fc68db79cb381572ed2e1`. The client implements atomic explicit recovery enrollment and a Rust-only bound recovery coordinator; pinned `npm run check` passed 20 frontend tests, 120 non-ignored Rust tests, protocol checks, Clippy, and builds, and the unsigned desktop build passed with the known non-fatal `rust-objcopy` warning. The service implements one-time KMS-backed SRS provisioning, expired-record deletion, sealed wrapper confirmation, post-release per-contact grants, digest-only 24-hour fragment links, bounded replacement, 10-minute OTP with resend invalidation, five-minute scoped claim tokens, lock-and-recheck release, redacted audit, and security email intents. Six I13 PostgreSQL tests and 96 total Dockerized tests passed, including KMS rollback and concurrent single-winner release; migration `350391c65e38` passed current/check and downgrade/re-upgrade, and focused format, critical lint, and Bandit checks passed. No AWS request, live email, deployment, resource provisioning, or protocol tag publication occurred. I14 is next eligible; I15 retains production AWS and resilience work.
-- 2026-09-27: I14 accepted after explicit approval of ADR 0015 and its complete Owner recovery, multi-device rotation, immutable-epoch, and post-compromise rekey design. Prepared protocol v1.3.0 is bound by digest `b7b0f41af9023ae7e30b4f21f5fae47976ec9b8cf490b50c8d61d81137abb75f`. The Rust core enforces response binding, replaces Owner access wrappers atomically, and performs fresh-VDK whole-Vault re-encryption with a fresh nonce ledger after release or claim. The service implements recent-device Owner authorization, mailbox OTP, 24-hour cooldown and cancellation, bounded same-device redelivery, generation activation, distinct per-device SRS records, exact partial status, immutable successor policy epochs, and historical released-presence heartbeats. Pinned `npm run check` passed 22 frontend tests, 112 non-ignored Rust library tests, 15 Rust integration tests, protocol checks, Clippy, and builds; the unsigned desktop build passed with the known non-fatal `rust-objcopy` warning. The Dockerized service passed 103 tests; migration head `b28a413c96d2`, Alembic current/check, focused Black and Black-compatible isort, critical Flake8, and focused Bandit passed. No AWS request, live email, deployment, resource provisioning, destructive migration rollback, or protocol tag publication occurred. G1 is next eligible; I15 retains production AWS and resilience work.
+- 2026-09-27: I14 accepted after explicit approval of ADR 0015 and its complete Owner recovery, multi-device rotation, immutable-epoch, and post-compromise rekey design. Prepared protocol v1.3.0 is bound by digest `b7b0f41af9023ae7e30b4f21f5fae47976ec9b8cf490b50c8d61d81137abb75f`. The Rust core enforces response binding, replaces Owner access wrappers atomically, and performs fresh-VDK whole-Vault re-encryption with a fresh nonce ledger after release or claim. The service implements recent-device Owner authorization, mailbox OTP, 24-hour cooldown and cancellation, bounded same-device redelivery, generation activation, distinct per-device SRS records, exact partial status, immutable successor policy epochs, and historical released-presence heartbeats. Pinned `npm run check` passed 22 frontend tests, 112 non-ignored Rust library tests, 15 Rust integration tests, protocol checks, Clippy, and builds; the unsigned desktop build passed with the known non-fatal `rust-objcopy` warning. The Dockerized service passed 103 tests; migration head `b28a413c96d2`, Alembic current/check, focused Black and Black-compatible isort, critical Flake8, and focused Bandit passed. No AWS request, live email, deployment, resource provisioning, destructive migration rollback, or protocol tag publication occurred. G1 awaits I08 acceptance; I15 retains production AWS and resilience work.

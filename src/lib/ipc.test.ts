@@ -5,6 +5,7 @@ import {
   chooseVaultExport,
   commitAttachment,
   getTransferStatus,
+  getLifecycleStatus,
   getVaultStatus,
   listItems,
   readAttachment,
@@ -24,7 +25,7 @@ const { invokeMock } = vi.hoisted(() => ({
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: invokeMock }));
 
-describe("I07 typed IPC client", () => {
+describe("I08 typed IPC client", () => {
   beforeEach(() => invokeMock.mockReset());
 
   it("sends strict top-level request bodies", async () => {
@@ -150,5 +151,27 @@ describe("I07 typed IPC client", () => {
     await expect(
       getTransferStatus("55555555555555555555555555555555"),
     ).rejects.toMatchObject({ code: "ipc_invalid_response" });
+  });
+
+  it("validates bounded lifecycle status responses", async () => {
+    const status = {
+      service: "unbound",
+      activity: "ready",
+      autostart: "disabled",
+      autostartDesired: false,
+      notifications: "not_requested",
+      locale: "en",
+      healthResetRequired: false,
+      canRequestNotifications: true,
+    };
+    invokeMock.mockResolvedValueOnce(status).mockResolvedValueOnce({
+      ...status,
+      activity: "invented",
+    });
+    await expect(getLifecycleStatus()).resolves.toEqual(status);
+    expect(invokeMock).toHaveBeenNthCalledWith(1, "lifecycle_status", {});
+    await expect(getLifecycleStatus()).rejects.toMatchObject({
+      code: "ipc_invalid_response",
+    });
   });
 });

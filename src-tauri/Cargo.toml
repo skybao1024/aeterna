@@ -7,13 +7,40 @@ edition = "2024"
 rust-version = "1.98.1"
 publish = false
 default-run = "aeterna-desktop"
+autobins = false
 
 [features]
 activity-prototype = []
+engineering-tools = []
+i08-native-probe = []
 
 [lib]
 name = "aeterna_lib"
 crate-type = ["lib", "cdylib", "staticlib"]
+
+[[bin]]
+name = "aeterna-desktop"
+path = "src/main.rs"
+
+[[bin]]
+name = "i02_argon2_benchmark"
+path = "src/bin/i02_argon2_benchmark.rs"
+required-features = ["engineering-tools"]
+
+[[bin]]
+name = "i02_keychain_probe"
+path = "src/bin/i02_keychain_probe.rs"
+required-features = ["engineering-tools"]
+
+[[bin]]
+name = "i04_windows_credential_probe"
+path = "src/bin/i04_windows_credential_probe.rs"
+required-features = ["engineering-tools"]
+
+[[bin]]
+name = "i08_memory_pressure"
+path = "src/bin/i08_memory_pressure.rs"
+required-features = ["engineering-tools"]
 
 [build-dependencies]
 tauri-build = { version = "=2.6.3", features = [] }
@@ -31,12 +58,13 @@ serde = { version = "=1.0.228", features = ["derive"] }
 serde_jcs = "=0.2.0"
 serde_json = "=1.0.151"
 sha2 = { version = "=0.10.9", default-features = false }
-tauri = { version = "=2.11.6", features = [] }
+tauri = { version = "=2.11.6", features = ["tray-icon"] }
 zeroize = { version = "=1.9.0", default-features = false, features = ["alloc"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 core-foundation = { version = "=0.10.1", features = ["link"] }
 libc = { version = "=0.2.189", default-features = false }
+block2 = { version = "=0.6.2", default-features = false, features = ["alloc"] }
 objc2 = { version = "=0.6.4", default-features = false, features = ["std"] }
 objc2-app-kit = { version = "=0.3.2", default-features = false, features = [
   "std",
@@ -49,7 +77,24 @@ objc2-app-kit = { version = "=0.3.2", default-features = false, features = [
   "NSWorkspace",
 ] }
 objc2-core-graphics = { version = "=0.3.2", default-features = false, features = ["std", "CGEventSource", "CGEventTypes"] }
-objc2-foundation = { version = "=0.3.2", default-features = false, features = ["std", "NSNotification", "NSObject", "NSString"] }
+objc2-foundation = { version = "=0.3.2", default-features = false, features = [
+  "std",
+  "NSAppleEventDescriptor",
+  "NSAppleEventManager",
+  "NSNotification",
+  "NSObject",
+  "NSString",
+] }
+objc2-service-management = { version = "=0.3.2", default-features = false, features = ["std", "objc2", "objc2-foundation", "SMAppService"] }
+objc2-user-notifications = { version = "=0.3.2", default-features = false, features = [
+  "std",
+  "block2",
+  "UNNotificationContent",
+  "UNNotificationRequest",
+  "UNNotificationSettings",
+  "UNNotificationTrigger",
+  "UNUserNotificationCenter",
+] }
 security-framework-sys = { version = "=2.17.0", features = ["OSX_10_15"] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
@@ -66,7 +111,7 @@ windows-sys = { version = "=0.61.2", default-features = false, features = [
 ] }
 
 [profile.release]
-panic = "abort"
+panic = "unwind"
 codegen-units = 1
 lto = true
 strip = true

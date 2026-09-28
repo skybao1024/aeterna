@@ -1,4 +1,5 @@
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -17,7 +18,7 @@ import {
   resolveSavedLocale,
 } from "./i18n";
 
-const { invokeMock } = vi.hoisted(() => ({
+const { invokeMock, listenMock } = vi.hoisted(() => ({
   invokeMock:
     vi.fn<
       (
@@ -26,9 +27,12 @@ const { invokeMock } = vi.hoisted(() => ({
         options?: { headers?: Record<string, string> },
       ) => Promise<unknown>
     >(),
+  listenMock:
+    vi.fn<(event: string, handler: () => void) => Promise<() => void>>(),
 }));
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: invokeMock }));
+vi.mock("@tauri-apps/api/event", () => ({ listen: listenMock }));
 
 const ITEM_ID = "11111111111111111111111111111111";
 const ATTACHMENT_ID = "22222222222222222222222222222222";
@@ -71,10 +75,14 @@ function resolved(value: unknown): Promise<unknown> {
   return Promise.resolve(value);
 }
 
-describe("I07 local vault workflow", () => {
+describe("I08 local vault and lifecycle workflow", () => {
   beforeEach(() => {
     window.localStorage.clear();
     invokeMock.mockReset();
+    listenMock.mockReset();
+    listenMock.mockResolvedValue(() => {
+      return undefined;
+    });
   });
 
   it("shows the truthful recovery-less initialization warning and initializes", async () => {
@@ -202,6 +210,63 @@ describe("I07 local vault workflow", () => {
       });
     });
     expect(await screen.findByText("保险箱项目")).toBeInTheDocument();
+  });
+
+  it("does not carry a cancelled native close into a later manual lock", async () => {
+    const user = userEvent.setup();
+    invokeMock.mockImplementation((command) => {
+      if (command === "vault_status") return resolved({ state: "unlocked" });
+      if (command === "vault_list_items") return resolved({ items: [] });
+      if (command === "vault_lock") return resolved({ state: "locked" });
+      throw new Error("unexpected command");
+    });
+    renderApplication();
+
+    await user.click(await screen.findByRole("button", { name: "New item" }));
+    await user.type(screen.getByLabelText("Title"), "Unsaved synthetic title");
+    const closeHandler = listenMock.mock.calls.find(
+      ([event]) => event === "lifecycle://close-requested",
+    )?.[1];
+    expect(closeHandler).toBeDefined();
+    act(() => closeHandler?.());
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(invokeMock).not.toHaveBeenCalledWith(
+      "vault_lock",
+      expect.anything(),
+    );
+
+    await user.click(screen.getByRole("button", { name: "Lock" }));
+    await user.click(screen.getByRole("button", { name: "Discard changes" }));
+    await waitFor(() => {
+      expect(invokeMock).toHaveBeenCalledWith("vault_lock", {
+        closeWindow: false,
+      });
+    });
+  });
+
+  it("locks before hiding after a confirmed native close", async () => {
+    const user = userEvent.setup();
+    invokeMock.mockImplementation((command) => {
+      if (command === "vault_status") return resolved({ state: "unlocked" });
+      if (command === "vault_list_items") return resolved({ items: [] });
+      if (command === "vault_lock") return resolved({ state: "locked" });
+      throw new Error("unexpected command");
+    });
+    renderApplication();
+
+    await user.click(await screen.findByRole("button", { name: "New item" }));
+    await user.type(screen.getByLabelText("Title"), "Unsaved synthetic title");
+    const closeHandler = listenMock.mock.calls.find(
+      ([event]) => event === "lifecycle://close-requested",
+    )?.[1];
+    expect(closeHandler).toBeDefined();
+    act(() => closeHandler?.());
+    await user.click(screen.getByRole("button", { name: "Discard changes" }));
+    await waitFor(() => {
+      expect(invokeMock).toHaveBeenCalledWith("vault_lock", {
+        closeWindow: true,
+      });
+    });
   });
 
   it("returns focus on cancellation and ignores a late item response after lock", async () => {
@@ -537,6 +602,76 @@ describe("I07 local vault workflow", () => {
     window.localStorage.setItem(LOCALE_STORAGE_KEY, "zh-CN");
     invokeMock.mockResolvedValue({ state: "locked" });
     renderApplication();
-    expect(screen.getByText("I07 本地开发预览")).toBeInTheDocument();
+    expect(screen.getByText("本地保险箱开发预览")).toBeInTheDocument();
+  });
+
+  it("retries native locale synchronization when a hidden launch becomes focused", async () => {
+    window.localStorage.setItem(LOCALE_STORAGE_KEY, "zh-CN");
+    const lifecycle = {
+      service: "unbound",
+      activity: "ready",
+      autostart: "disabled",
+      autostartDesired: false,
+      notifications: "not_requested",
+      locale: "en",
+      healthResetRequired: false,
+      canRequestNotifications: false,
+    };
+    let attempts = 0;
+    invokeMock.mockImplementation((command) => {
+      if (command === "vault_status") return resolved({ state: "locked" });
+      if (command === "lifecycle_status") return resolved(lifecycle);
+      if (command === "lifecycle_set_locale") {
+        attempts += 1;
+        return attempts === 1
+          ? Promise.reject(new Error("lifecycle_user_gesture_required"))
+          : resolved({ ...lifecycle, locale: "zh-CN" });
+      }
+      throw new Error("unexpected command");
+    });
+    renderApplication();
+    await waitFor(() => {
+      expect(attempts).toBe(1);
+    });
+    window.dispatchEvent(new Event("focus"));
+    await waitFor(() => {
+      expect(attempts).toBe(2);
+    });
+    expect(screen.getAllByText("本地保险箱开发预览")).toHaveLength(2);
+  });
+
+  it("shows bounded lifecycle facets and changes autostart explicitly", async () => {
+    const user = userEvent.setup();
+    const lifecycle = {
+      service: "unbound",
+      activity: "ready",
+      autostart: "disabled",
+      autostartDesired: false,
+      notifications: "not_requested",
+      locale: "en",
+      healthResetRequired: false,
+      canRequestNotifications: true,
+    };
+    invokeMock.mockImplementation((command) => {
+      if (command === "vault_status") return resolved({ state: "locked" });
+      if (command === "lifecycle_status") return resolved(lifecycle);
+      if (command === "lifecycle_set_autostart")
+        return resolved({
+          ...lifecycle,
+          autostart: "enabled",
+          autostartDesired: true,
+        });
+      throw new Error("unexpected command");
+    });
+    renderApplication();
+    expect(
+      await screen.findByRole("region", { name: "Background health" }),
+    ).toHaveTextContent("Activity agent ready");
+    await user.click(screen.getByRole("button", { name: "Launch at login" }));
+    await waitFor(() => {
+      expect(invokeMock).toHaveBeenCalledWith("lifecycle_set_autostart", {
+        enabled: true,
+      });
+    });
   });
 });

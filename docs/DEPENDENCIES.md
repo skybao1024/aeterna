@@ -173,3 +173,32 @@ service, telemetry path, or updater. It reuses the exact accepted
 project-owned `unsafe` code is confined to the small macOS syscall adapter;
 Objective-C lifetime and main-thread rules remain owned by the generated
 `objc2` bindings.
+
+## I08 approved macOS lifecycle dependencies
+
+Approval date: 2026-09-22. The user explicitly approved ADR 0011 and the exact
+dependency, permission, persistence, and native-API proposal in
+[`research/I08-macos-lifecycle-dependency-and-permission-proposal.md`](./research/I08-macos-lifecycle-dependency-and-permission-proposal.md).
+
+| Dependency / feature change                | Scope                                                                                                                                   | Purpose and review result                                                                                                                                            |
+| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Tauri 2.11.6 `tray-icon`                   | Existing exact runtime pin; built-in feature only                                                                                       | Native tray icon and bounded menu. `tray-icon` 0.24.2 and `muda` 0.19.3 were already locked transitively. No plugin command, network, or permission prompt is added. |
+| `objc2-service-management` 0.3.2           | New direct macOS-only pin; defaults off; `std`, `objc2`, `objc2-foundation`, `SMAppService`                                             | Generated binding for the public macOS 15 main-app login-item API. Zlib OR Apache-2.0 OR MIT; no remote service or runtime download.                                 |
+| `objc2-user-notifications` 0.3.2           | Existing transitive release made direct; defaults off; only notification-center, settings, content, request, trigger, and block support | Public UserNotifications settings, explicit authorization, and one fixed generic health notification. Zlib OR Apache-2.0 OR MIT; no push/network client.             |
+| `block2` 0.6.2                             | Existing locked transitive release made direct; defaults off; `alloc`                                                                   | Owns the completion blocks required by UserNotifications. Zlib OR Apache-2.0 OR MIT; no I/O, permission, or network behavior.                                        |
+| `objc2-foundation` 0.3.2 feature expansion | Existing exact macOS pin; adds only Apple Event descriptor/manager types                                                                | Reads the documented login-item launch Apple Event. It does not send Apple Events or request Automation permission.                                                  |
+| Tauri release/configuration                | `panic = "unwind"`; built floor macOS 15.0                                                                                              | Contains Rust panics before foreign ABIs and permits supervised worker cleanup. The floor is an I08 build constraint, not a final I15 bundle/signing identity.       |
+
+I08 adds no npm package, Tauri autostart/notification/single-instance plugin,
+network client, helper process, LaunchAgent writer, remote content, telemetry,
+updater, or new macOS privacy entitlement. Direct `block2` use is required to
+construct the completion blocks exposed by the already approved minimal
+UserNotifications feature; it adds no new lockfile package.
+
+The lockfile adds exactly `objc2-service-management` 0.3.2 and its generated
+framework dependency `objc2-security` 0.3.2. The latter provides only the
+typed Security-framework definitions referenced by the generated
+`SMAppService` binding; Aeterna does not call it directly, broaden Keychain
+permissions, or add network behavior. `objc2-user-notifications` and `block2`
+were already present in the locked Tauri graph and are now direct dependencies
+with the reviewed minimal features.

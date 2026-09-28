@@ -676,6 +676,11 @@ fn parse_input_sample(
         InputSampleValue::AgeSeconds(value) if value > Duration::MAX.as_secs_f64() => {
             return Err(SuppressionReason::InputAgeOutOfRange);
         }
+        InputSampleValue::AgeSeconds(value)
+            if value > captured_at.as_millis() as f64 / MILLIS_PER_SECOND =>
+        {
+            return Err(SuppressionReason::InputAgeOutOfRange);
+        }
         InputSampleValue::AgeSeconds(value) => value,
         InputSampleValue::Missing => return Err(SuppressionReason::MissingInputAge),
         InputSampleValue::Failed(_) => return Err(SuppressionReason::InputSampleFailed),
@@ -691,7 +696,7 @@ mod tests {
     use super::*;
 
     fn at(seconds: u64) -> MonotonicTime {
-        MonotonicTime::from_millis(seconds * 1_000)
+        MonotonicTime::from_millis((seconds + 10_000) * 1_000)
     }
 
     fn observation(seconds: u64, kind: ObservationKind) -> ActivityObservation {
@@ -732,6 +737,17 @@ mod tests {
             ActivityDecision::Suppressed(SuppressionReason::InputBaselineEstablished)
         );
         policy
+    }
+
+    #[test]
+    fn input_age_cannot_precede_the_process_monotonic_epoch() {
+        assert_eq!(
+            parse_input_sample(
+                MonotonicTime::from_millis(2_000),
+                InputSampleValue::AgeSeconds(2.001)
+            ),
+            Err(SuppressionReason::InputAgeOutOfRange)
+        );
     }
 
     #[test]

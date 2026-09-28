@@ -7,10 +7,17 @@ import {
   useState,
 } from "react";
 import { useTranslation } from "react-i18next";
+import { listen } from "@tauri-apps/api/event";
 
 import { Button } from "./components/ui/button";
 import { RecoveryStatusPanel } from "./components/recovery-status";
-import { DEFAULT_LOCALE, persistLocale, type SupportedLocale } from "./i18n";
+import {
+  DEFAULT_LOCALE,
+  LOCALE_STORAGE_KEY,
+  persistLocale,
+  SUPPORTED_LOCALES,
+  type SupportedLocale,
+} from "./i18n";
 import {
   cancelAttachment,
   cancelTransfer,
@@ -20,17 +27,23 @@ import {
   createItem,
   deleteItem,
   getItem,
+  getLifecycleStatus,
   getTransferStatus,
   getVaultStatus,
   initializeVault,
   type ItemDraft,
   type ItemSummary,
+  type LifecycleStatus,
   listItems,
   lockVault,
   MAX_ATTACHMENT_BYTES,
   prepareAttachment,
   readAttachment,
   removeAttachment,
+  requestLifecycleNotificationPermission,
+  resetLifecycleHealthState,
+  setLifecycleAutostart,
+  setLifecycleLocale,
   startVaultExport,
   startVaultImport,
   type TransferStatus,
@@ -87,6 +100,8 @@ const EMPTY_DRAFT: ItemDraft = {
   body: "",
 };
 
+const LIFECYCLE_REFRESH_INTERVAL_MS = 15 * 60 * 1000;
+
 export function App() {
   const { i18n, t } = useTranslation();
   const [phase, setPhase] = useState<AppPhase>("checking");
@@ -108,10 +123,13 @@ export function App() {
     null,
   );
   const [lastExportAt, setLastExportAt] = useState<Date | null>(null);
+  const [lifecycleStatus, setLifecycleStatus] =
+    useState<LifecycleStatus | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const confirmationInvokerRef = useRef<HTMLElement | null>(null);
   const lockingRef = useRef(false);
   const sessionEpoch = useRef(0);
+  const nativeCloseAction = useRef<() => void>(() => undefined);
 
   const currentLocale: SupportedLocale =
     i18n.resolvedLanguage === "zh-CN" ? "zh-CN" : DEFAULT_LOCALE;
@@ -143,6 +161,71 @@ export function App() {
       });
     return () => {
       active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    let localeSynchronized = false;
+    let localeSyncPending = false;
+    const refresh = () => {
+      void getLifecycleStatus()
+        .then((status) => {
+          if (!active) return;
+          setLifecycleStatus(status);
+          if (localeSynchronized) return;
+          const saved = window.localStorage.getItem(LOCALE_STORAGE_KEY);
+          if (SUPPORTED_LOCALES.includes(saved as SupportedLocale)) {
+            if (saved !== status.locale) {
+              if (localeSyncPending) return;
+              localeSyncPending = true;
+              void setLifecycleLocale(saved as SupportedLocale)
+                .then((next) => {
+                  if (active) {
+                    localeSynchronized = true;
+                    setLifecycleStatus(next);
+                  }
+                })
+                .catch(() => undefined)
+                .finally(() => {
+                  localeSyncPending = false;
+                });
+            } else {
+              localeSynchronized = true;
+            }
+          } else {
+            localeSynchronized = true;
+            void i18n.changeLanguage(status.locale);
+          }
+        })
+        .catch(() => undefined);
+    };
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") refresh();
+    };
+    refresh();
+    const timer = window.setInterval(refresh, LIFECYCLE_REFRESH_INTERVAL_MS);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+    };
+  }, [i18n]);
+
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    void listen("lifecycle://close-requested", () => {
+      nativeCloseAction.current();
+    })
+      .then((dispose) => {
+        unlisten = dispose;
+      })
+      .catch(() => undefined);
+    return () => {
+      unlisten?.();
     };
   }, []);
 
@@ -317,11 +400,14 @@ export function App() {
       clearEditor();
       void i18n.changeLanguage(nextLocale).then(() => {
         persistLocale(window.localStorage, nextLocale);
+        void setLifecycleLocale(nextLocale)
+          .then(setLifecycleStatus)
+          .catch(() => undefined);
       });
     });
   };
 
-  const performLock = () => {
+  const performLock = (closeWindow = false) => {
     if (lockingRef.current) return;
     lockingRef.current = true;
     sessionEpoch.current += 1;
@@ -329,7 +415,7 @@ export function App() {
     setBusy(true);
     setErrorCode(null);
     setPhase("checking");
-    void lockVault()
+    void lockVault(closeWindow)
       .then(() => {
         setPhase("locked");
       })
@@ -341,6 +427,22 @@ export function App() {
         lockingRef.current = false;
         setBusy(false);
       });
+  };
+
+  useEffect(() => {
+    nativeCloseAction.current = () => {
+      if (phase === "unlocked") {
+        withDiscardConfirmation(() => {
+          performLock(true);
+        });
+      }
+    };
+  });
+
+  const runLifecycleAction = (operation: () => Promise<LifecycleStatus>) => {
+    void runBusy(async () => {
+      setLifecycleStatus(await operation());
+    });
   };
 
   const chooseExport = () => {
@@ -642,6 +744,38 @@ export function App() {
         </div>
       ) : null}
 
+      {lifecycleStatus ? (
+        <LifecyclePanel
+          status={lifecycleStatus}
+          busy={busy}
+          onAutostart={() => {
+            runLifecycleAction(() =>
+              setLifecycleAutostart(
+                lifecycleStatus.autostart === "drifted"
+                  ? lifecycleStatus.autostartDesired
+                  : !lifecycleStatus.autostartDesired,
+              ),
+            );
+          }}
+          onNotifications={() => {
+            runLifecycleAction(requestLifecycleNotificationPermission);
+          }}
+          onReset={() => {
+            openConfirmation(
+              {
+                title: t("lifecycle.resetTitle"),
+                description: t("lifecycle.resetDescription"),
+                confirmLabel: t("lifecycle.resetHealth"),
+                destructive: true,
+              },
+              () => {
+                runLifecycleAction(resetLifecycleHealthState);
+              },
+            );
+          }}
+        />
+      ) : null}
+
       {phase === "checking" ? (
         <CenteredMessage>{t("status.checking")}</CenteredMessage>
       ) : null}
@@ -788,6 +922,71 @@ export function App() {
         />
       ) : null}
     </main>
+  );
+}
+
+function LifecyclePanel({
+  status,
+  busy,
+  onAutostart,
+  onNotifications,
+  onReset,
+}: {
+  status: LifecycleStatus;
+  busy: boolean;
+  onAutostart: () => void;
+  onNotifications: () => void;
+  onReset: () => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <section
+      aria-label={t("lifecycle.heading")}
+      className="mx-auto mt-4 max-w-7xl rounded-xl border border-white/10 bg-white/[0.035] px-4 py-3"
+    >
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-sm font-semibold text-stone-200">
+            {t("lifecycle.heading")}
+          </h2>
+          <p className="mt-1 text-xs text-stone-400">
+            {t(`lifecycle.service.${status.service}`)} ·{" "}
+            {t(`lifecycle.activity.${status.activity}`)} ·{" "}
+            {t(`lifecycle.autostart.${status.autostart}`)} ·{" "}
+            {t(`lifecycle.notifications.${status.notifications}`)}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {status.autostart !== "unavailable" ? (
+            <Button variant="secondary" disabled={busy} onClick={onAutostart}>
+              {t(
+                status.autostart === "drifted"
+                  ? status.autostartDesired
+                    ? "lifecycle.openLoginItems"
+                    : "lifecycle.disableAutostart"
+                  : status.autostartDesired
+                    ? "lifecycle.disableAutostart"
+                    : "lifecycle.enableAutostart",
+              )}
+            </Button>
+          ) : null}
+          {status.canRequestNotifications ? (
+            <Button
+              variant="secondary"
+              disabled={busy}
+              onClick={onNotifications}
+            >
+              {t("lifecycle.enableNotifications")}
+            </Button>
+          ) : null}
+          {status.healthResetRequired ? (
+            <Button variant="secondary" disabled={busy} onClick={onReset}>
+              {t("lifecycle.resetHealth")}
+            </Button>
+          ) : null}
+        </div>
+      </div>
+    </section>
   );
 }
 

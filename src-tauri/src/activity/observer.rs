@@ -68,7 +68,12 @@ impl PollingObserver {
                     let Ok(guard) = lock.lock() else {
                         break;
                     };
-                    if condition.wait_timeout(guard, interval).is_err() {
+                    if condition
+                        .wait_timeout_while(guard, interval, |_| {
+                            !worker_stop.load(Ordering::Acquire)
+                        })
+                        .is_err()
+                    {
                         break;
                     }
                 }
@@ -83,8 +88,10 @@ impl PollingObserver {
     }
 
     pub fn stop(&mut self) -> Result<(), ObserverStopError> {
+        let guard = self.wake_worker.0.lock().ok();
         self.stop_requested.store(true, Ordering::Release);
         self.wake_worker.1.notify_all();
+        drop(guard);
         if let Some(worker) = self.worker.take() {
             worker
                 .join()

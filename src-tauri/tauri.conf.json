@@ -20,7 +20,8 @@
         "minWidth": 720,
         "minHeight": 560,
         "resizable": true,
-        "fullscreen": false
+        "fullscreen": false,
+        "visible": false
       }
     ],
     "security": {
@@ -33,25 +34,33 @@
       "dangerousDisableAssetCspModification": false,
       "csp": {
         "default-src": "'self'",
-        "connect-src": "ipc: http://ipc.localhost",
+        "connect-src": "'self' ipc: http://ipc.localhost",
         "font-src": "'self'",
         "img-src": "'self' data:",
         "style-src": "'self'",
         "script-src": "'self'",
         "object-src": "'none'",
         "frame-src": "'none'",
+        "child-src": "'none'",
+        "worker-src": "'none'",
+        "media-src": "'none'",
+        "manifest-src": "'none'",
         "base-uri": "'none'",
         "form-action": "'none'"
       },
       "devCsp": {
         "default-src": "'self' http://127.0.0.1:1420",
-        "connect-src": "ipc: http://ipc.localhost http://127.0.0.1:1420 ws://127.0.0.1:1420",
+        "connect-src": "'self' ipc: http://ipc.localhost http://127.0.0.1:1420 ws://127.0.0.1:1420",
         "font-src": "'self' http://127.0.0.1:1420",
         "img-src": "'self' data: http://127.0.0.1:1420",
         "style-src": "'self' 'unsafe-inline' http://127.0.0.1:1420",
         "script-src": "'self' http://127.0.0.1:1420",
         "object-src": "'none'",
         "frame-src": "'none'",
+        "child-src": "'none'",
+        "worker-src": "'none'",
+        "media-src": "'none'",
+        "manifest-src": "'none'",
         "base-uri": "'none'",
         "form-action": "'none'"
       }
@@ -59,6 +68,9 @@
   },
   "bundle": {
     "active": false,
-    "icon": ["icons/512x512.png"]
+    "icon": ["icons/512x512.png"],
+    "macOS": {
+      "minimumSystemVersion": "15.0"
+    }
   }
 }
