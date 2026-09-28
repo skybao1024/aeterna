@@ -55,6 +55,13 @@ fn profile() -> Argon2Profile {
     Argon2Profile::new(65_536, 1, 1)
 }
 
+fn replacement_password() -> MasterPassword {
+    match MasterPassword::new(vec![0x62; 16]) {
+        Ok(value) => value,
+        Err(_) => panic!("synthetic replacement password should be accepted"),
+    }
+}
+
 fn note(title: &str, body: &str) -> ItemDraft {
     match ItemDraft::new(
         ItemKind::Note,
@@ -300,6 +307,56 @@ fn attachment_edges_are_bounded_and_mutations_are_revisioned() {
         ),
         Err(VaultError::InvalidInput)
     ));
+}
+
+#[test]
+fn post_compromise_rekey_covers_item_and_embedded_attachment_payloads() {
+    let directory = TestDirectory::new("post-compromise-attachment");
+    let path = directory.vault();
+    let bootstrap = VaultRepository::initialize(&path, &password(), profile())
+        .expect("vault initialization should succeed");
+    let (repository, old_material) = bootstrap.into_parts();
+    let vault = repository
+        .unlock(&password())
+        .expect("vault unlock should succeed");
+    let item = vault
+        .create_item(note("Rekey attachment", "Encrypted body"))
+        .expect("item creation should succeed");
+    let item = vault
+        .add_attachment(
+            item.id,
+            item.revision,
+            "proof.bin".to_owned(),
+            "application/octet-stream".to_owned(),
+            b"embedded attachment marker".to_vec(),
+        )
+        .expect("attachment creation should succeed");
+    let attachment_id = item.attachments[0].id;
+
+    let outcome = vault
+        .rekey_after_release_or_claim(&replacement_password(), profile(), [0x81; 16], [0x82; 32])
+        .expect("whole-Vault rekey should succeed");
+
+    assert!(repository.unlock(&password()).is_err());
+    assert!(repository.unlock_recovery(&old_material).is_err());
+    let rekeyed_item = outcome
+        .vault
+        .get_item(item.id)
+        .expect("rekeyed item should decode");
+    assert_eq!(&*rekeyed_item.title, "Rekey attachment");
+    assert_eq!(
+        &*outcome
+            .vault
+            .read_attachment(item.id, rekeyed_item.revision, attachment_id)
+            .expect("rekeyed attachment should decrypt"),
+        b"embedded attachment marker"
+    );
+    assert!(repository.unlock(&replacement_password()).is_ok());
+    assert!(
+        repository
+            .unlock_recovery(&outcome.enrollment.material)
+            .is_ok()
+    );
 }
 
 #[test]

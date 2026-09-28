@@ -9,6 +9,7 @@ import {
 import { useTranslation } from "react-i18next";
 
 import { Button } from "./components/ui/button";
+import { RecoveryStatusPanel } from "./components/recovery-status";
 import { DEFAULT_LOCALE, persistLocale, type SupportedLocale } from "./i18n";
 import {
   cancelAttachment,
@@ -677,6 +678,7 @@ export function App() {
               </span>
             ) : null}
           </div>
+          <RecoveryStatusPanel state={{ kind: "not_configured" }} />
           <aside className="rounded-2xl border border-white/10 bg-white/[0.035] p-4">
             <div className="flex items-center justify-between gap-3">
               <h1 className="font-serif text-xl">{t("items.heading")}</h1>

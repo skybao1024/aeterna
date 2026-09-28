@@ -23,6 +23,10 @@ pub const DEVICE_STATUS_CHANGE_DOMAIN: &str = "aeterna.device-status.change.v1";
 pub const RECOVERY_PROVISION_DOMAIN: &str = "aeterna.recovery-record.provision.v1";
 pub const RECOVERY_CONFIRM_DOMAIN: &str = "aeterna.recovery-record.confirm.v1";
 pub const RECOVERY_ABANDON_DOMAIN: &str = "aeterna.recovery-record.abandon.v1";
+pub const OWNER_RECOVERY_START_DOMAIN: &str = "aeterna.owner-recovery.start.v1";
+pub const OWNER_RECOVERY_ACTION_DOMAIN: &str = "aeterna.owner-recovery.action.v1";
+pub const RECOVERY_ROTATION_PROVISION_DOMAIN: &str = "aeterna.recovery-rotation.provision.v1";
+pub const RECOVERY_ROTATION_CONFIRM_DOMAIN: &str = "aeterna.recovery-rotation.confirm.v1";
 pub const MAX_PROTOCOL_BODY_BYTES: usize = 16_384;
 pub const MAX_EMAIL_BYTES: usize = 254;
 pub const MAX_DEVICE_LABEL_BYTES: usize = 64;
@@ -253,10 +257,217 @@ pub struct RecoverySecretRequest {
 pub struct RecoverySecretData {
     pub account_id: String,
     pub device_id: String,
+    pub policy_epoch: u64,
+    pub recovery_generation: u64,
     pub recovery_id: String,
+    pub rekey_required: bool,
     pub srs: String,
     pub vault_id: String,
     pub wrapper_digest: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct OwnerRecoveryStartDocument {
+    pub account_id: String,
+    pub canonicalization: String,
+    pub device_id: String,
+    pub domain: String,
+    pub operation: String,
+    pub policy_epoch: u64,
+    pub protocol_version: u16,
+    pub recovery_generation: u64,
+    pub recovery_id: String,
+    pub request_id: String,
+    pub signature_version: u16,
+    pub vault_id: String,
+    pub wrapper_digest: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct OwnerRecoveryVerifyRequest {
+    pub protocol_version: u16,
+    pub request_id: String,
+    pub owner_recovery_id: String,
+    pub challenge_id: String,
+    pub code: String,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum OwnerRecoveryAction {
+    Cancel,
+    Release,
+    Complete,
+    Status,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct OwnerRecoveryActionDocument {
+    pub account_id: String,
+    pub action: OwnerRecoveryAction,
+    pub canonicalization: String,
+    pub device_id: String,
+    pub domain: String,
+    pub operation: String,
+    pub owner_recovery_id: String,
+    pub protocol_version: u16,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub recovery_id: Option<String>,
+    pub request_id: String,
+    pub signature_version: u16,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub vault_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub wrapper_digest: Option<String>,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum OwnerRecoveryState {
+    PendingEmail,
+    CoolingDown,
+    Ready,
+    MaterialReleased,
+    Completed,
+    Cancelled,
+    Expired,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct OwnerRecoveryData {
+    pub account_id: String,
+    pub challenge_id: String,
+    pub cooldown_seconds: u32,
+    pub device_id: String,
+    pub expires_at: String,
+    pub owner_recovery_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ready_at: Option<String>,
+    pub rekey_required: bool,
+    pub state: OwnerRecoveryState,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct OwnerRecoverySecretData {
+    pub account_id: String,
+    pub device_id: String,
+    pub owner_recovery_id: String,
+    pub policy_epoch: u64,
+    pub recovery_generation: u64,
+    pub recovery_id: String,
+    pub rekey_required: bool,
+    pub srs: String,
+    pub vault_id: String,
+    pub wrapper_digest: String,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RecoveryRotationKind {
+    ErcRotation,
+    PostCompromise,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct RecoveryRotationProvisionDocument {
+    pub account_id: String,
+    pub canonicalization: String,
+    pub device_id: String,
+    pub domain: String,
+    pub kind: RecoveryRotationKind,
+    pub operation: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub owner_recovery_id: Option<String>,
+    pub protocol_version: u16,
+    pub recovery_id: String,
+    pub request_id: String,
+    pub rotation_id: String,
+    pub signature_version: u16,
+    pub source_generation: u64,
+    pub source_policy_epoch: u64,
+    pub target_generation: u64,
+    pub target_policy_epoch: u64,
+    pub vault_id: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct RecoveryRotationConfirmDocument {
+    pub account_id: String,
+    pub canonicalization: String,
+    pub device_id: String,
+    pub domain: String,
+    pub operation: String,
+    pub protocol_version: u16,
+    pub recovery_id: String,
+    pub request_id: String,
+    pub rotation_id: String,
+    pub signature_version: u16,
+    pub target_generation: u64,
+    pub target_policy_epoch: u64,
+    pub vault_id: String,
+    pub wrapper_digest: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct RecoveryRotationProvisionData {
+    pub account_id: String,
+    pub device_id: String,
+    pub expires_at: String,
+    pub recovery_id: String,
+    pub rotation_id: String,
+    pub srs: String,
+    pub target_generation: u64,
+    pub target_policy_epoch: u64,
+    pub vault_id: String,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RotationDeviceState {
+    Pending,
+    NotEnrolled,
+    Complete,
+    Excluded,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct RotationDeviceData {
+    pub device_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub device_label: Option<String>,
+    pub state: RotationDeviceState,
+    pub updated_at: String,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RecoveryRotationState {
+    Preparing,
+    Active,
+    Complete,
+    Cancelled,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct RecoveryRotationData {
+    pub account_id: String,
+    pub complete: bool,
+    pub devices: Vec<RotationDeviceData>,
+    pub kind: RecoveryRotationKind,
+    pub rotation_id: String,
+    pub state: RecoveryRotationState,
+    pub target_generation: u64,
+    pub target_policy_epoch: u64,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -609,8 +820,150 @@ pub fn validate_recovery_secret_data(data: &RecoverySecretData) -> Result<(), Pr
     ] {
         validate_uuid(value)?;
     }
+    if data.policy_epoch == 0 || data.recovery_generation == 0 || !data.rekey_required {
+        return Err(ProtocolError::UnsupportedProtocolVersion);
+    }
     decode_exact::<32>(&data.wrapper_digest)?;
     decode_exact::<32>(&data.srs)?;
+    Ok(())
+}
+
+pub fn validate_owner_recovery_start(
+    document: &OwnerRecoveryStartDocument,
+) -> Result<(), ProtocolError> {
+    validate_signed_header(
+        SignedHeaderRef::from_owner_recovery_start(document),
+        OWNER_RECOVERY_START_DOMAIN,
+        "owner_recovery.start",
+    )?;
+    for value in [
+        &document.account_id,
+        &document.device_id,
+        &document.recovery_id,
+        &document.vault_id,
+    ] {
+        validate_uuid(value)?;
+    }
+    if document.policy_epoch == 0 || document.recovery_generation == 0 {
+        return Err(ProtocolError::UnsupportedProtocolVersion);
+    }
+    decode_exact::<32>(&document.wrapper_digest)?;
+    Ok(())
+}
+
+pub fn validate_owner_recovery_action(
+    document: &OwnerRecoveryActionDocument,
+) -> Result<(), ProtocolError> {
+    validate_signed_header(
+        SignedHeaderRef::from_owner_recovery_action(document),
+        OWNER_RECOVERY_ACTION_DOMAIN,
+        "owner_recovery.action",
+    )?;
+    for value in [
+        &document.account_id,
+        &document.device_id,
+        &document.owner_recovery_id,
+    ] {
+        validate_uuid(value)?;
+    }
+    let needs_binding = matches!(
+        document.action,
+        OwnerRecoveryAction::Release | OwnerRecoveryAction::Complete
+    );
+    match (
+        &document.recovery_id,
+        &document.vault_id,
+        &document.wrapper_digest,
+        needs_binding,
+    ) {
+        (Some(recovery_id), Some(vault_id), Some(wrapper_digest), true) => {
+            validate_uuid(recovery_id)?;
+            validate_uuid(vault_id)?;
+            decode_exact::<32>(wrapper_digest)?;
+            Ok(())
+        }
+        (None, None, None, false) => Ok(()),
+        _ => Err(ProtocolError::InvalidBase64Url),
+    }
+}
+
+pub fn validate_owner_recovery_secret_data(
+    data: &OwnerRecoverySecretData,
+) -> Result<(), ProtocolError> {
+    for value in [
+        &data.account_id,
+        &data.device_id,
+        &data.owner_recovery_id,
+        &data.recovery_id,
+        &data.vault_id,
+    ] {
+        validate_uuid(value)?;
+    }
+    if data.policy_epoch == 0 || data.recovery_generation == 0 {
+        return Err(ProtocolError::UnsupportedProtocolVersion);
+    }
+    decode_exact::<32>(&data.wrapper_digest)?;
+    decode_exact::<32>(&data.srs)?;
+    Ok(())
+}
+
+pub fn validate_rotation_provision(
+    document: &RecoveryRotationProvisionDocument,
+) -> Result<(), ProtocolError> {
+    validate_signed_header(
+        SignedHeaderRef::from_rotation_provision(document),
+        RECOVERY_ROTATION_PROVISION_DOMAIN,
+        "recovery_rotation.provision",
+    )?;
+    for value in [
+        &document.account_id,
+        &document.device_id,
+        &document.recovery_id,
+        &document.rotation_id,
+        &document.vault_id,
+    ] {
+        validate_uuid(value)?;
+    }
+    if let Some(value) = &document.owner_recovery_id {
+        validate_uuid(value)?;
+    }
+    if document.source_generation == 0
+        || document.source_policy_epoch == 0
+        || document.target_generation != document.source_generation.saturating_add(1)
+        || document.target_policy_epoch < document.source_policy_epoch
+        || (document.kind == RecoveryRotationKind::ErcRotation
+            && (document.target_policy_epoch != document.source_policy_epoch
+                || document.owner_recovery_id.is_some()))
+        || (document.kind == RecoveryRotationKind::PostCompromise
+            && (document.target_policy_epoch != document.source_policy_epoch.saturating_add(1)
+                || document.owner_recovery_id.is_none()))
+    {
+        return Err(ProtocolError::UnsupportedProtocolVersion);
+    }
+    Ok(())
+}
+
+pub fn validate_rotation_confirm(
+    document: &RecoveryRotationConfirmDocument,
+) -> Result<(), ProtocolError> {
+    validate_signed_header(
+        SignedHeaderRef::from_rotation_confirm(document),
+        RECOVERY_ROTATION_CONFIRM_DOMAIN,
+        "recovery_rotation.confirm",
+    )?;
+    for value in [
+        &document.account_id,
+        &document.device_id,
+        &document.recovery_id,
+        &document.rotation_id,
+        &document.vault_id,
+    ] {
+        validate_uuid(value)?;
+    }
+    if document.target_generation < 2 || document.target_policy_epoch == 0 {
+        return Err(ProtocolError::UnsupportedProtocolVersion);
+    }
+    decode_exact::<32>(&document.wrapper_digest)?;
     Ok(())
 }
 
@@ -695,6 +1048,50 @@ impl<'a> SignedHeaderRef<'a> {
     }
 
     fn from_recovery_action(document: &'a RecoveryRecordActionDocument) -> Self {
+        Self {
+            protocol_version: document.protocol_version,
+            signature_version: document.signature_version,
+            canonicalization: &document.canonicalization,
+            domain: &document.domain,
+            operation: &document.operation,
+            request_id: &document.request_id,
+        }
+    }
+
+    fn from_owner_recovery_start(document: &'a OwnerRecoveryStartDocument) -> Self {
+        Self {
+            protocol_version: document.protocol_version,
+            signature_version: document.signature_version,
+            canonicalization: &document.canonicalization,
+            domain: &document.domain,
+            operation: &document.operation,
+            request_id: &document.request_id,
+        }
+    }
+
+    fn from_owner_recovery_action(document: &'a OwnerRecoveryActionDocument) -> Self {
+        Self {
+            protocol_version: document.protocol_version,
+            signature_version: document.signature_version,
+            canonicalization: &document.canonicalization,
+            domain: &document.domain,
+            operation: &document.operation,
+            request_id: &document.request_id,
+        }
+    }
+
+    fn from_rotation_provision(document: &'a RecoveryRotationProvisionDocument) -> Self {
+        Self {
+            protocol_version: document.protocol_version,
+            signature_version: document.signature_version,
+            canonicalization: &document.canonicalization,
+            domain: &document.domain,
+            operation: &document.operation,
+            request_id: &document.request_id,
+        }
+    }
+
+    fn from_rotation_confirm(document: &'a RecoveryRotationConfirmDocument) -> Self {
         Self {
             protocol_version: document.protocol_version,
             signature_version: document.signature_version,
@@ -866,6 +1263,50 @@ mod tests {
         document: RecoveryRecordActionDocument,
     }
 
+    #[derive(Deserialize)]
+    #[serde(deny_unknown_fields)]
+    struct OwnerRecoveryStartSignatureFixture {
+        fixture_version: u16,
+        seed: String,
+        public_key: String,
+        canonical_bytes: String,
+        signature: String,
+        document: OwnerRecoveryStartDocument,
+    }
+
+    #[derive(Deserialize)]
+    #[serde(deny_unknown_fields)]
+    struct OwnerRecoveryActionSignatureFixture {
+        fixture_version: u16,
+        seed: String,
+        public_key: String,
+        canonical_bytes: String,
+        signature: String,
+        document: OwnerRecoveryActionDocument,
+    }
+
+    #[derive(Deserialize)]
+    #[serde(deny_unknown_fields)]
+    struct RotationProvisionSignatureFixture {
+        fixture_version: u16,
+        seed: String,
+        public_key: String,
+        canonical_bytes: String,
+        signature: String,
+        document: RecoveryRotationProvisionDocument,
+    }
+
+    #[derive(Deserialize)]
+    #[serde(deny_unknown_fields)]
+    struct RotationConfirmSignatureFixture {
+        fixture_version: u16,
+        seed: String,
+        public_key: String,
+        canonical_bytes: String,
+        signature: String,
+        document: RecoveryRotationConfirmDocument,
+    }
+
     #[test]
     fn recovery_record_signature_fixtures_match_and_validate() {
         let provision: RecoveryProvisionSignatureFixture = serde_json::from_str(include_str!(
@@ -914,6 +1355,97 @@ mod tests {
         assert!(
             serde_json::from_str::<SignedEnvelope<RecoveryRecordProvisionDocument>>(invalid)
                 .is_err()
+        );
+    }
+
+    #[test]
+    fn owner_recovery_and_rotation_fixtures_use_distinct_signed_domains() {
+        let owner_start: OwnerRecoveryStartSignatureFixture = serde_json::from_str(include_str!(
+            "../../protocol/v1/fixtures/signatures/owner-recovery-start.json"
+        ))
+        .expect("Owner recovery start fixture should parse");
+        let owner_action: OwnerRecoveryActionSignatureFixture = serde_json::from_str(include_str!(
+            "../../protocol/v1/fixtures/signatures/owner-recovery-action.json"
+        ))
+        .expect("Owner recovery action fixture should parse");
+        let rotation_provision: RotationProvisionSignatureFixture = serde_json::from_str(
+            include_str!("../../protocol/v1/fixtures/signatures/recovery-rotation-provision.json"),
+        )
+        .expect("rotation provision fixture should parse");
+        let rotation_confirm: RotationConfirmSignatureFixture = serde_json::from_str(include_str!(
+            "../../protocol/v1/fixtures/signatures/recovery-rotation-confirm.json"
+        ))
+        .expect("rotation confirm fixture should parse");
+        assert_eq!(owner_start.fixture_version, 1);
+        assert_eq!(owner_action.fixture_version, 1);
+        assert_eq!(rotation_provision.fixture_version, 1);
+        assert_eq!(rotation_confirm.fixture_version, 1);
+        assert_eq!(decode_exact::<32>(&owner_start.seed), Ok([0x11; 32]));
+        assert_eq!(decode_exact::<32>(&owner_action.seed), Ok([0x11; 32]));
+        assert_eq!(decode_exact::<32>(&rotation_provision.seed), Ok([0x11; 32]));
+        assert_eq!(decode_exact::<32>(&rotation_confirm.seed), Ok([0x11; 32]));
+        assert_eq!(validate_owner_recovery_start(&owner_start.document), Ok(()));
+        assert_eq!(
+            validate_owner_recovery_action(&owner_action.document),
+            Ok(())
+        );
+        assert_eq!(
+            validate_rotation_provision(&rotation_provision.document),
+            Ok(())
+        );
+        assert_eq!(
+            validate_rotation_confirm(&rotation_confirm.document),
+            Ok(())
+        );
+        let mut mismatched_rotation = rotation_provision.document.clone();
+        mismatched_rotation.kind = RecoveryRotationKind::ErcRotation;
+        mismatched_rotation.target_policy_epoch = mismatched_rotation.source_policy_epoch;
+        assert!(validate_rotation_provision(&mismatched_rotation).is_err());
+        let public = decode_public_key(&owner_start.public_key).expect("public key should decode");
+        for (document, canonical, signature) in [
+            (
+                serde_json::to_value(&owner_start.document).expect("document should serialize"),
+                owner_start.canonical_bytes,
+                owner_start.signature,
+            ),
+            (
+                serde_json::to_value(&owner_action.document).expect("document should serialize"),
+                owner_action.canonical_bytes,
+                owner_action.signature,
+            ),
+            (
+                serde_json::to_value(&rotation_provision.document)
+                    .expect("document should serialize"),
+                rotation_provision.canonical_bytes,
+                rotation_provision.signature,
+            ),
+            (
+                serde_json::to_value(&rotation_confirm.document)
+                    .expect("document should serialize"),
+                rotation_confirm.canonical_bytes,
+                rotation_confirm.signature,
+            ),
+        ] {
+            assert_eq!(
+                URL_SAFE_NO_PAD.encode(canonical_bytes(&document).expect("JCS should succeed")),
+                canonical
+            );
+            assert_eq!(verify_document(&public, &document, &signature), Ok(()));
+        }
+        assert_eq!(owner_action.public_key, owner_start.public_key);
+        assert_eq!(rotation_provision.public_key, owner_start.public_key);
+        assert_eq!(rotation_confirm.public_key, owner_start.public_key);
+
+        let secret: SuccessResponse<OwnerRecoverySecretData> = serde_json::from_str(include_str!(
+            "../../protocol/v1/fixtures/valid/owner-recovery-secret-response.json"
+        ))
+        .expect("Owner secret fixture should parse");
+        assert_eq!(validate_owner_recovery_secret_data(&secret.data), Ok(()));
+        assert!(
+            serde_json::from_str::<SignedEnvelope<OwnerRecoveryStartDocument>>(include_str!(
+                "../../protocol/v1/fixtures/invalid/owner-recovery-start-forbidden-data.json"
+            ))
+            .is_err()
         );
     }
 

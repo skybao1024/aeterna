@@ -1,0 +1,23 @@
+{
+  "protocol_version": 1,
+  "signed": {
+    "account_id": "00000000-0000-4000-8000-000000000020",
+    "canonicalization": "jcs-rfc8785",
+    "device_id": "00000000-0000-4000-8000-000000000003",
+    "domain": "aeterna.recovery-rotation.provision.v1",
+    "kind": "post_compromise",
+    "operation": "recovery_rotation.provision",
+    "owner_recovery_id": "00000000-0000-4000-8000-000000000050",
+    "protocol_version": 1,
+    "recovery_id": "00000000-0000-4000-8000-000000000055",
+    "request_id": "00000000-0000-4000-8000-000000000056",
+    "rotation_id": "00000000-0000-4000-8000-000000000054",
+    "signature_version": 1,
+    "source_generation": 1,
+    "source_policy_epoch": 1,
+    "target_generation": 2,
+    "target_policy_epoch": 2,
+    "vault_id": "00000000-0000-4000-8000-000000000042"
+  },
+  "signature": "Ae7GlQPGuc8mxipOxOlMgDtkbGasqzIS9Cx9VkXREtH8Q8COI2t_SQz-8bkT0serQaxjGW9EWOWQ6eaK6zLjCQ"
+}

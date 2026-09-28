@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:aeterna:protocol:v1:recovery-rotation-response",
+  "additionalProperties": false,
+  "properties": {
+    "protocol_version": { "$ref": "common.schema.json#/$defs/protocolVersion" },
+    "request_id": { "$ref": "common.schema.json#/$defs/uuid" },
+    "data": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": { "$ref": "common.schema.json#/$defs/uuid" },
+        "complete": { "type": "boolean" },
+        "devices": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "device_id": { "$ref": "common.schema.json#/$defs/uuid" },
+              "device_label": {
+                "$ref": "common.schema.json#/$defs/deviceLabel"
+              },
+              "state": {
+                "$ref": "common.schema.json#/$defs/rotationDeviceState"
+              },
+              "updated_at": { "$ref": "common.schema.json#/$defs/timestamp" }
+            },
+            "required": ["device_id", "state", "updated_at"],
+            "type": "object"
+          },
+          "maxItems": 32,
+          "type": "array"
+        },
+        "kind": { "$ref": "common.schema.json#/$defs/rotationKind" },
+        "rotation_id": { "$ref": "common.schema.json#/$defs/uuid" },
+        "state": {
+          "enum": ["preparing", "active", "complete", "cancelled"],
+          "type": "string"
+        },
+        "target_generation": { "minimum": 2, "type": "integer" },
+        "target_policy_epoch": { "minimum": 1, "type": "integer" }
+      },
+      "required": [
+        "account_id",
+        "complete",
+        "devices",
+        "kind",
+        "rotation_id",
+        "state",
+        "target_generation",
+        "target_policy_epoch"
+      ],
+      "type": "object"
+    }
+  },
+  "required": ["protocol_version", "request_id", "data"],
+  "type": "object"
+}

@@ -14,6 +14,24 @@
     "checking": "正在检查本地保险箱……",
     "unavailable": "当前环境无法使用本地保险箱。"
   },
+  "recovery": {
+    "heading": "恢复保护",
+    "readyAt": "最早可在 {{date}} 释放。",
+    "deviceList": "各设备的恢复保护状态",
+    "states": {
+      "not_configured": "此本地预览尚未连接延迟恢复服务。丢失主密码仍会失去访问权限。",
+      "cooling_down": "Owner 恢复正在可取消的冷静期内。",
+      "rekey_required": "恢复的数据必须先使用新的 VDK 和新凭据重新加密，才能正常访问。",
+      "partial": "新的恢复代次已激活，但并非所有设备都已受到保护。",
+      "protected": "所有符合条件的设备均已确认恢复保护。"
+    },
+    "deviceStates": {
+      "pending": "待处理",
+      "not_enrolled": "未登记",
+      "complete": "已完成",
+      "excluded": "已排除"
+    }
+  },
   "setup": {
     "title": "创建本地保险箱",
     "description": "设置主密码，在此设备上保护加密笔记、说明和有大小限制的附件。",

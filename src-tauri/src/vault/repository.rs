@@ -12,8 +12,8 @@ use std::{
 use std::os::unix::fs::OpenOptionsExt;
 
 use rusqlite::{
-    Connection, OpenFlags, OptionalExtension, TransactionBehavior, config::DbConfig, limits::Limit,
-    params,
+    Connection, OpenFlags, OptionalExtension, Transaction, TransactionBehavior, config::DbConfig,
+    limits::Limit, params,
 };
 use zeroize::{Zeroize, Zeroizing};
 
@@ -141,6 +141,23 @@ impl fmt::Debug for RecoveryEnrollment {
             .debug_struct("RecoveryEnrollment")
             .field("binding", &self.binding)
             .field("material", &"[REDACTED]")
+            .finish()
+    }
+}
+
+pub struct PostCompromiseRekey {
+    pub vault: UnlockedVault,
+    pub enrollment: RecoveryEnrollment,
+    pub reencrypted_records: u64,
+}
+
+impl fmt::Debug for PostCompromiseRekey {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("PostCompromiseRekey")
+            .field("vault", &"[REDACTED]")
+            .field("enrollment", &"[REDACTED]")
+            .field("reencrypted_records", &self.reencrypted_records)
             .finish()
     }
 }
@@ -497,6 +514,344 @@ impl VaultRepository {
 }
 
 impl UnlockedVault {
+    pub fn replace_access_wrappers_after_owner_recovery(
+        &self,
+        new_password: &MasterPassword,
+        new_profile: Argon2Profile,
+        recovery_id: [u8; 16],
+        erc: ErcEntropy,
+        mut srs: [u8; 32],
+    ) -> VaultResult<RecoveryEnrollment> {
+        new_profile.validate()?;
+        let mut connection = self.repository.connection()?;
+        let metadata = load_metadata(&connection)?;
+        verify_header_authentication(&metadata, &self.vdk)?;
+        if recovery_id == metadata.recovery.recovery_id {
+            return Err(VaultError::Conflict);
+        }
+
+        let material = RecoveryMaterial::from_parts(erc, srs);
+        srs.zeroize();
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let master_nonce = reserve_transaction_nonce(
+            &transaction,
+            self.repository.runtime.random.as_ref(),
+            MASTER_NONCE_PURPOSE,
+            self.repository.runtime.clock.now_ms()?,
+        )?;
+        let recovery_nonce = reserve_transaction_nonce(
+            &transaction,
+            self.repository.runtime.random.as_ref(),
+            RECOVERY_NONCE_PURPOSE,
+            self.repository.runtime.clock.now_ms()?,
+        )?;
+        let header_nonce = reserve_transaction_nonce(
+            &transaction,
+            self.repository.runtime.random.as_ref(),
+            HEADER_NONCE_PURPOSE,
+            self.repository.runtime.clock.now_ms()?,
+        )?;
+        let mut salt = [0_u8; 16];
+        self.repository.runtime.random.fill(&mut salt)?;
+        let updated_at_ms = self
+            .repository
+            .runtime
+            .clock
+            .now_ms()?
+            .max(metadata.header.updated_at_ms);
+        let replacement_master = MasterRow {
+            revision: metadata
+                .master
+                .revision
+                .checked_add(1)
+                .ok_or(VaultError::InvalidInput)?,
+            wrapper: create_master_wrapper_with_material(
+                new_password,
+                &self.vdk,
+                wrapper_context(&metadata.header),
+                new_profile,
+                MasterSalt::from_bytes(salt),
+                master_nonce,
+            )?,
+            created_at_ms: metadata.master.created_at_ms,
+            updated_at_ms,
+        };
+        let replacement_recovery = RecoveryRow {
+            recovery_id,
+            device_id: metadata.header.device_id,
+            wrapper: create_recovery_wrapper_with_nonce(
+                material.erc(),
+                material.recovery_salt(),
+                &self.vdk,
+                wrapper_context(&metadata.header),
+                recovery_nonce,
+            )?,
+            created_at_ms: updated_at_ms,
+        };
+        let replacement_header = HeaderRow {
+            auth_nonce: header_nonce,
+            auth_tag: [0; 16],
+            updated_at_ms,
+            ..metadata.header
+        };
+        let digest = wrapper_digest(
+            replacement_header.vault_id,
+            &replacement_master,
+            &replacement_recovery,
+        )?;
+        let aad = header_aad(&replacement_header, digest);
+        let auth_tag: [u8; 16] =
+            read_array(&encrypt_payload(&self.vdk, &header_nonce, &[], &aad)?)?;
+
+        replace_master_row(&transaction, &replacement_master, metadata.master.revision)?;
+        replace_recovery_row(
+            &transaction,
+            &replacement_recovery,
+            metadata.recovery.recovery_id,
+        )?;
+        replace_header_authentication(
+            &transaction,
+            header_nonce,
+            auth_tag,
+            updated_at_ms,
+            metadata.header.updated_at_ms,
+        )?;
+        transaction.commit()?;
+
+        Ok(RecoveryEnrollment {
+            binding: RecoveryBinding {
+                vault_id: replacement_header.vault_id,
+                device_id: replacement_header.device_id,
+                recovery_id,
+                wrapper_digest: recovery_wrapper_digest(&replacement_recovery)?,
+            },
+            material,
+        })
+    }
+
+    pub fn rekey_after_release_or_claim(
+        self,
+        new_password: &MasterPassword,
+        new_profile: Argon2Profile,
+        recovery_id: [u8; 16],
+        mut srs: [u8; 32],
+    ) -> VaultResult<PostCompromiseRekey> {
+        self.rekey_after_release_or_claim_with_checkpoint(
+            new_password,
+            new_profile,
+            recovery_id,
+            &mut srs,
+            |_| Ok(()),
+        )
+    }
+
+    fn rekey_after_release_or_claim_with_checkpoint(
+        self,
+        new_password: &MasterPassword,
+        new_profile: Argon2Profile,
+        recovery_id: [u8; 16],
+        srs: &mut [u8; 32],
+        mut checkpoint: impl FnMut(RekeyCheckpoint) -> VaultResult<()>,
+    ) -> VaultResult<PostCompromiseRekey> {
+        new_profile.validate()?;
+        let mut connection = self.repository.connection()?;
+        let metadata = load_metadata(&connection)?;
+        verify_header_authentication(&metadata, &self.vdk)?;
+        if recovery_id == metadata.recovery.recovery_id {
+            return Err(VaultError::Conflict);
+        }
+
+        let new_vdk = Vdk::from_bytes(random_array(self.repository.runtime.random.as_ref())?);
+        let erc = ErcEntropy::from_bytes(random_array(self.repository.runtime.random.as_ref())?);
+        let material = RecoveryMaterial::from_parts(erc, *srs);
+        srs.zeroize();
+        let mut used_nonces = HashSet::new();
+        let master_nonce =
+            unique_rekey_nonce(self.repository.runtime.random.as_ref(), &mut used_nonces)?;
+        let recovery_nonce =
+            unique_rekey_nonce(self.repository.runtime.random.as_ref(), &mut used_nonces)?;
+        let header_nonce =
+            unique_rekey_nonce(self.repository.runtime.random.as_ref(), &mut used_nonces)?;
+        let mut salt = [0_u8; 16];
+        self.repository.runtime.random.fill(&mut salt)?;
+        let updated_at_ms = self
+            .repository
+            .runtime
+            .clock
+            .now_ms()?
+            .max(metadata.header.updated_at_ms);
+        let replacement_master = MasterRow {
+            revision: metadata
+                .master
+                .revision
+                .checked_add(1)
+                .ok_or(VaultError::InvalidInput)?,
+            wrapper: create_master_wrapper_with_material(
+                new_password,
+                &new_vdk,
+                wrapper_context(&metadata.header),
+                new_profile,
+                MasterSalt::from_bytes(salt),
+                master_nonce,
+            )?,
+            created_at_ms: metadata.master.created_at_ms,
+            updated_at_ms,
+        };
+        let replacement_recovery = RecoveryRow {
+            recovery_id,
+            device_id: metadata.header.device_id,
+            wrapper: create_recovery_wrapper_with_nonce(
+                material.erc(),
+                material.recovery_salt(),
+                &new_vdk,
+                wrapper_context(&metadata.header),
+                recovery_nonce,
+            )?,
+            created_at_ms: updated_at_ms,
+        };
+        let replacement_header = HeaderRow {
+            auth_nonce: header_nonce,
+            auth_tag: [0; 16],
+            updated_at_ms,
+            ..metadata.header
+        };
+        let digest = wrapper_digest(
+            replacement_header.vault_id,
+            &replacement_master,
+            &replacement_recovery,
+        )?;
+        let aad = header_aad(&replacement_header, digest);
+        let auth_tag: [u8; 16] = read_array(&encrypt_payload(&new_vdk, &header_nonce, &[], &aad)?)?;
+
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let record_ids = {
+            let mut statement =
+                transaction.prepare("SELECT record_id FROM vault_records ORDER BY record_id")?;
+            let mut rows = statement.query([])?;
+            let mut ids = Vec::new();
+            while let Some(row) = rows.next()? {
+                ids.push(read_array(&row.get::<_, Vec<u8>>(0)?)?);
+            }
+            ids
+        };
+        let mut record_nonces = Vec::with_capacity(record_ids.len());
+        for record_id in &record_ids {
+            let (generation, frame, created_at_ms, prior_updated_at_ms) = transaction.query_row(
+                "SELECT generation, frame, created_at_ms, updated_at_ms FROM vault_records WHERE record_id = ?1",
+                [record_id.as_slice()],
+                |row| {
+                    Ok((
+                        row.get::<_, i64>(0)?,
+                        row.get::<_, Vec<u8>>(1)?,
+                        row.get::<_, i64>(2)?,
+                        row.get::<_, i64>(3)?,
+                    ))
+                },
+            )?;
+            let generation = positive_u64(generation)?;
+            let next_generation = generation.checked_add(1).ok_or(VaultError::InvalidInput)?;
+            let created_at_ms = nonnegative_u64(created_at_ms)?;
+            let prior_updated_at_ms = nonnegative_u64(prior_updated_at_ms)?;
+            if prior_updated_at_ms < created_at_ms {
+                return Err(VaultError::InvalidFormat);
+            }
+            let decoded = decode_frame(&frame)?;
+            verify_reserved_nonce(&transaction, &decoded.nonce, RECORD_NONCE_PURPOSE)?;
+            let old_aad = record_aad(
+                self.vault_id,
+                *record_id,
+                generation,
+                created_at_ms,
+                prior_updated_at_ms,
+                decoded.plaintext_length,
+            )?;
+            let plaintext = Zeroizing::new(decrypt_payload(
+                &self.vdk,
+                &decoded.nonce,
+                decoded.ciphertext_and_tag,
+                &old_aad,
+            )?);
+            if plaintext.len() != decoded.plaintext_length {
+                return Err(VaultError::InvalidFormat);
+            }
+            let nonce =
+                unique_rekey_nonce(self.repository.runtime.random.as_ref(), &mut used_nonces)?;
+            let record_updated_at_ms = updated_at_ms.max(prior_updated_at_ms);
+            let new_aad = record_aad(
+                self.vault_id,
+                *record_id,
+                next_generation,
+                created_at_ms,
+                record_updated_at_ms,
+                plaintext.len(),
+            )?;
+            let encrypted = encrypt_payload(&new_vdk, &nonce, &plaintext, &new_aad)?;
+            let replacement_frame = encode_frame(nonce, &encrypted)?;
+            let changed = transaction.execute(
+                "UPDATE vault_records SET generation = ?1, frame = ?2, updated_at_ms = ?3 WHERE record_id = ?4 AND generation = ?5",
+                params![
+                    to_sql_integer(next_generation)?,
+                    replacement_frame,
+                    to_sql_integer(record_updated_at_ms)?,
+                    record_id.as_slice(),
+                    to_sql_integer(generation)?,
+                ],
+            )?;
+            if changed != 1 {
+                return Err(VaultError::Conflict);
+            }
+            record_nonces.push(nonce);
+        }
+        checkpoint(RekeyCheckpoint::RecordsReencrypted)?;
+
+        replace_master_row(&transaction, &replacement_master, metadata.master.revision)?;
+        replace_recovery_row(
+            &transaction,
+            &replacement_recovery,
+            metadata.recovery.recovery_id,
+        )?;
+        replace_header_authentication(
+            &transaction,
+            header_nonce,
+            auth_tag,
+            updated_at_ms,
+            metadata.header.updated_at_ms,
+        )?;
+        transaction.execute("DELETE FROM nonce_reservations", [])?;
+        for (nonce, purpose) in [
+            (master_nonce, MASTER_NONCE_PURPOSE),
+            (recovery_nonce, RECOVERY_NONCE_PURPOSE),
+            (header_nonce, HEADER_NONCE_PURPOSE),
+        ] {
+            insert_nonce_reservation(&transaction, nonce, purpose, updated_at_ms)?;
+        }
+        for nonce in record_nonces {
+            insert_nonce_reservation(&transaction, nonce, RECORD_NONCE_PURPOSE, updated_at_ms)?;
+        }
+        checkpoint(RekeyCheckpoint::MetadataReplaced)?;
+        transaction.commit()?;
+
+        let binding = RecoveryBinding {
+            vault_id: replacement_header.vault_id,
+            device_id: replacement_header.device_id,
+            recovery_id,
+            wrapper_digest: recovery_wrapper_digest(&replacement_recovery)?,
+        };
+        let repository = self.repository.clone();
+        let vault_id = self.vault_id;
+        drop(self);
+        Ok(PostCompromiseRekey {
+            vault: UnlockedVault {
+                repository,
+                vdk: new_vdk,
+                vault_id,
+            },
+            enrollment: RecoveryEnrollment { binding, material },
+            reencrypted_records: u64::try_from(record_ids.len())
+                .map_err(|_| VaultError::InvalidInput)?,
+        })
+    }
+
     pub fn replace_recovery_wrapper(
         &self,
         recovery_id: [u8; 16],
@@ -819,6 +1174,142 @@ impl UnlockedVault {
         transaction.commit()?;
         Ok(())
     }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum RekeyCheckpoint {
+    RecordsReencrypted,
+    MetadataReplaced,
+}
+
+fn replace_master_row(
+    connection: &Connection,
+    replacement: &MasterRow,
+    expected_revision: u64,
+) -> VaultResult<()> {
+    let changed = connection.execute(
+        "UPDATE master_wrapper SET revision = ?1, format_version = ?2, aead_algorithm = ?3, purpose = ?4, kdf_algorithm = ?5, kdf_version = ?6, memory_kib = ?7, time_cost = ?8, parallelism = ?9, output_length = ?10, salt = ?11, nonce = ?12, ciphertext_and_tag = ?13, updated_at_ms = ?14 WHERE singleton = 1 AND revision = ?15",
+        params![
+            to_sql_integer(replacement.revision)?,
+            i64::from(replacement.wrapper.format_version),
+            i64::from(replacement.wrapper.aead_algorithm),
+            i64::from(replacement.wrapper.purpose),
+            i64::from(replacement.wrapper.kdf_algorithm),
+            i64::from(replacement.wrapper.kdf_version),
+            i64::from(replacement.wrapper.profile.memory_kib),
+            i64::from(replacement.wrapper.profile.time_cost),
+            i64::from(replacement.wrapper.profile.parallelism),
+            i64::from(replacement.wrapper.profile.output_length),
+            replacement.wrapper.salt.as_slice(),
+            replacement.wrapper.nonce.as_slice(),
+            replacement.wrapper.ciphertext_and_tag.as_slice(),
+            to_sql_integer(replacement.updated_at_ms)?,
+            to_sql_integer(expected_revision)?,
+        ],
+    )?;
+    if changed != 1 {
+        return Err(VaultError::Conflict);
+    }
+    Ok(())
+}
+
+fn replace_recovery_row(
+    connection: &Connection,
+    replacement: &RecoveryRow,
+    expected_recovery_id: [u8; 16],
+) -> VaultResult<()> {
+    let changed = connection.execute(
+        "UPDATE recovery_wrapper SET recovery_id = ?1, device_id = ?2, format_version = ?3, aead_algorithm = ?4, purpose = ?5, nonce = ?6, ciphertext_and_tag = ?7, created_at_ms = ?8 WHERE singleton = 1 AND recovery_id = ?9",
+        params![
+            replacement.recovery_id.as_slice(),
+            replacement.device_id.as_slice(),
+            i64::from(replacement.wrapper.format_version),
+            i64::from(replacement.wrapper.aead_algorithm),
+            i64::from(replacement.wrapper.purpose),
+            replacement.wrapper.nonce.as_slice(),
+            replacement.wrapper.ciphertext_and_tag.as_slice(),
+            to_sql_integer(replacement.created_at_ms)?,
+            expected_recovery_id.as_slice(),
+        ],
+    )?;
+    if changed != 1 {
+        return Err(VaultError::Conflict);
+    }
+    Ok(())
+}
+
+fn replace_header_authentication(
+    connection: &Connection,
+    nonce: [u8; 12],
+    tag: [u8; 16],
+    updated_at_ms: u64,
+    expected_updated_at_ms: u64,
+) -> VaultResult<()> {
+    let changed = connection.execute(
+        "UPDATE vault_header SET header_auth_nonce = ?1, header_auth_tag = ?2, updated_at_ms = ?3 WHERE singleton = 1 AND updated_at_ms = ?4",
+        params![
+            nonce.as_slice(),
+            tag.as_slice(),
+            to_sql_integer(updated_at_ms)?,
+            to_sql_integer(expected_updated_at_ms)?,
+        ],
+    )?;
+    if changed != 1 {
+        return Err(VaultError::Conflict);
+    }
+    Ok(())
+}
+
+fn insert_nonce_reservation(
+    connection: &Connection,
+    nonce: [u8; 12],
+    purpose: i64,
+    reserved_at_ms: u64,
+) -> VaultResult<()> {
+    let inserted = connection.execute(
+        "INSERT INTO nonce_reservations (nonce, purpose, reserved_at_ms) VALUES (?1, ?2, ?3)",
+        params![nonce.as_slice(), purpose, to_sql_integer(reserved_at_ms)?],
+    )?;
+    if inserted != 1 {
+        return Err(VaultError::Conflict);
+    }
+    Ok(())
+}
+
+fn reserve_transaction_nonce(
+    transaction: &Transaction<'_>,
+    random: &dyn RandomSource,
+    purpose: i64,
+    reserved_at_ms: u64,
+) -> VaultResult<[u8; 12]> {
+    for _ in 0..NONCE_ATTEMPTS {
+        let nonce = random_array(random)?;
+        let inserted = transaction.execute(
+            "INSERT OR IGNORE INTO nonce_reservations (nonce, purpose, reserved_at_ms) VALUES (?1, ?2, ?3)",
+            params![
+                nonce.as_slice(),
+                purpose,
+                to_sql_integer(reserved_at_ms)?
+            ],
+        )?;
+        if inserted == 1 {
+            return Ok(nonce);
+        }
+    }
+    Err(VaultError::RandomnessUnavailable)
+}
+
+fn unique_rekey_nonce(
+    random: &dyn RandomSource,
+    observed: &mut HashSet<[u8; 12]>,
+) -> VaultResult<[u8; 12]> {
+    for _ in 0..NONCE_ATTEMPTS {
+        let nonce = random_array(random)?;
+        if observed.insert(nonce) {
+            return Ok(nonce);
+        }
+    }
+    Err(VaultError::RandomnessUnavailable)
 }
 
 fn initialize_staging_database(
@@ -1421,6 +1912,7 @@ mod tests {
     };
 
     use super::*;
+    use crate::crypto::{decode_erc, encode_erc};
 
     struct SequenceRandom {
         values: Mutex<VecDeque<Vec<u8>>>,
@@ -1573,6 +2065,186 @@ mod tests {
     }
 
     #[test]
+    fn owner_recovery_replaces_both_wrappers_without_reencrypting_records() {
+        let path = temporary_path("owner-wrapper-replacement");
+        let old_password = password(0x31);
+        let new_password = password(0x32);
+        let bootstrap = VaultRepository::initialize(&path, &old_password, profile())
+            .expect("vault initialization should succeed");
+        let (repository, old_material) = bootstrap.into_parts();
+        let unlocked = repository
+            .unlock_recovery(&old_material)
+            .expect("old recovery material should unlock");
+        let record = unlocked
+            .create_record(b"owner recovery preserves ciphertext")
+            .expect("record should be created");
+        let before = repository
+            .connection()
+            .and_then(|connection| {
+                connection
+                    .query_row(
+                        "SELECT frame FROM vault_records WHERE record_id = ?1",
+                        [record.id.0.as_slice()],
+                        |row| row.get::<_, Vec<u8>>(0),
+                    )
+                    .map_err(Into::into)
+            })
+            .expect("record frame should load");
+        let encoded_erc = encode_erc(old_material.erc()).expect("ERC should encode");
+        let enrollment = unlocked
+            .replace_access_wrappers_after_owner_recovery(
+                &new_password,
+                profile(),
+                [0x41; 16],
+                decode_erc(&encoded_erc).expect("ERC should decode"),
+                [0x42; 32],
+            )
+            .expect("both wrappers should be replaced atomically");
+        let after = repository
+            .connection()
+            .and_then(|connection| {
+                connection
+                    .query_row(
+                        "SELECT frame FROM vault_records WHERE record_id = ?1",
+                        [record.id.0.as_slice()],
+                        |row| row.get::<_, Vec<u8>>(0),
+                    )
+                    .map_err(Into::into)
+            })
+            .expect("record frame should load");
+
+        assert_eq!(before, after);
+        assert!(repository.unlock(&old_password).is_err());
+        assert!(repository.unlock_recovery(&old_material).is_err());
+        let reopened = repository
+            .unlock(&new_password)
+            .expect("new master password should unlock");
+        assert_eq!(
+            reopened
+                .read_record(record.id)
+                .expect("record should remain readable")
+                .plaintext(),
+            b"owner recovery preserves ciphertext"
+        );
+        assert!(repository.unlock_recovery(&enrollment.material).is_ok());
+        cleanup_owned_staging_files(&path);
+    }
+
+    #[test]
+    fn post_compromise_rekey_reencrypts_every_record_and_replaces_factors() {
+        let path = temporary_path("post-compromise-rekey");
+        let old_password = password(0x51);
+        let new_password = password(0x52);
+        let bootstrap = VaultRepository::initialize(&path, &old_password, profile())
+            .expect("vault initialization should succeed");
+        let (repository, old_material) = bootstrap.into_parts();
+        let unlocked = repository
+            .unlock(&old_password)
+            .expect("old master password should unlock");
+        let first = unlocked
+            .create_record(b"first post-compromise record")
+            .expect("first record should be created");
+        let second = unlocked
+            .create_record(b"second post-compromise record")
+            .expect("second record should be created");
+        let old_frames = record_frames(&repository);
+
+        let outcome = unlocked
+            .rekey_after_release_or_claim(&new_password, profile(), [0x61; 16], [0x62; 32])
+            .expect("post-compromise rekey should commit");
+
+        assert_eq!(outcome.reencrypted_records, 2);
+        assert_ne!(record_frames(&repository), old_frames);
+        assert!(repository.unlock(&old_password).is_err());
+        assert!(repository.unlock_recovery(&old_material).is_err());
+        assert_eq!(
+            outcome
+                .vault
+                .read_record(first.id)
+                .expect("first record should decrypt")
+                .plaintext(),
+            b"first post-compromise record"
+        );
+        assert_eq!(
+            outcome
+                .vault
+                .read_record(second.id)
+                .expect("second record should decrypt")
+                .plaintext(),
+            b"second post-compromise record"
+        );
+        assert_eq!(
+            outcome
+                .vault
+                .read_record(first.id)
+                .expect("first record should remain available")
+                .generation,
+            2
+        );
+        assert!(repository.unlock(&new_password).is_ok());
+        assert!(
+            repository
+                .unlock_recovery(&outcome.enrollment.material)
+                .is_ok()
+        );
+        assert_eq!(nonce_count(&repository), 5);
+        assert_eq!(distinct_nonce_count(&repository), 5);
+        cleanup_owned_staging_files(&path);
+    }
+
+    #[test]
+    fn interrupted_post_compromise_rekey_rolls_back_every_sqlite_change() {
+        for stop_at in [
+            RekeyCheckpoint::RecordsReencrypted,
+            RekeyCheckpoint::MetadataReplaced,
+        ] {
+            let path = temporary_path("interrupted-post-compromise-rekey");
+            let old_password = password(0x71);
+            let new_password = password(0x72);
+            let bootstrap = VaultRepository::initialize(&path, &old_password, profile())
+                .expect("vault initialization should succeed");
+            let (repository, old_material) = bootstrap.into_parts();
+            let unlocked = repository
+                .unlock(&old_password)
+                .expect("old master password should unlock");
+            let record = unlocked
+                .create_record(b"rollback marker")
+                .expect("record should be created");
+            let before_frames = record_frames(&repository);
+            let before_nonces = nonce_count(&repository);
+            let result = unlocked.rekey_after_release_or_claim_with_checkpoint(
+                &new_password,
+                profile(),
+                [0x73; 16],
+                &mut [0x74; 32],
+                |checkpoint| {
+                    if checkpoint == stop_at {
+                        Err(VaultError::Io)
+                    } else {
+                        Ok(())
+                    }
+                },
+            );
+
+            assert!(matches!(result, Err(VaultError::Io)));
+            assert_eq!(record_frames(&repository), before_frames);
+            assert_eq!(nonce_count(&repository), before_nonces);
+            assert!(repository.unlock(&new_password).is_err());
+            let recovered = repository
+                .unlock_recovery(&old_material)
+                .expect("old complete Vault should survive rollback");
+            assert_eq!(
+                recovered
+                    .read_record(record.id)
+                    .expect("old record should survive rollback")
+                    .plaintext(),
+                b"rollback marker"
+            );
+            cleanup_owned_staging_files(&path);
+        }
+    }
+
+    #[test]
     fn public_debug_output_redacts_paths_secrets_ids_and_plaintext() {
         let repository = VaultRepository {
             path: PathBuf::from("/sensitive/example.sqlite"),
@@ -1701,5 +2373,32 @@ mod tests {
             Ok(value) => value,
             Err(error) => panic!("nonce count failed: {error}"),
         }
+    }
+
+    fn distinct_nonce_count(repository: &VaultRepository) -> i64 {
+        let connection = repository
+            .connection()
+            .expect("vault connection should open");
+        connection
+            .query_row(
+                "SELECT COUNT(DISTINCT nonce) FROM nonce_reservations",
+                [],
+                |row| row.get(0),
+            )
+            .expect("distinct nonce count should load")
+    }
+
+    fn record_frames(repository: &VaultRepository) -> Vec<Vec<u8>> {
+        let connection = repository
+            .connection()
+            .expect("vault connection should open");
+        let mut statement = connection
+            .prepare("SELECT frame FROM vault_records ORDER BY record_id")
+            .expect("record query should prepare");
+        statement
+            .query_map([], |row| row.get(0))
+            .expect("record query should execute")
+            .collect::<rusqlite::Result<Vec<Vec<u8>>>>()
+            .expect("record frames should load")
     }
 }

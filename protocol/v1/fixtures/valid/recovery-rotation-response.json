@@ -1,0 +1,27 @@
+{
+  "protocol_version": 1,
+  "request_id": "00000000-0000-4000-8000-000000000057",
+  "data": {
+    "account_id": "00000000-0000-4000-8000-000000000020",
+    "complete": false,
+    "devices": [
+      {
+        "device_id": "00000000-0000-4000-8000-000000000003",
+        "device_label": "Owner Mac",
+        "state": "complete",
+        "updated_at": "2030-01-02T03:04:05Z"
+      },
+      {
+        "device_id": "00000000-0000-4000-8000-000000000004",
+        "device_label": "Travel Mac",
+        "state": "pending",
+        "updated_at": "2030-01-02T03:04:05Z"
+      }
+    ],
+    "kind": "erc_rotation",
+    "rotation_id": "00000000-0000-4000-8000-000000000054",
+    "state": "active",
+    "target_generation": 2,
+    "target_policy_epoch": 1
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "protocol_version": 1,
+  "request_id": "00000000-0000-4000-8000-000000000056",
+  "data": {
+    "account_id": "00000000-0000-4000-8000-000000000020",
+    "device_id": "00000000-0000-4000-8000-000000000003",
+    "expires_at": "2030-01-03T03:04:05Z",
+    "recovery_id": "00000000-0000-4000-8000-000000000055",
+    "rotation_id": "00000000-0000-4000-8000-000000000054",
+    "srs": "VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVU",
+    "target_generation": 2,
+    "target_policy_epoch": 1,
+    "vault_id": "00000000-0000-4000-8000-000000000042"
+  }
+}

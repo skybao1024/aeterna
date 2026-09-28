@@ -31,6 +31,15 @@
     { "code": "recovery.otp_invalid", "http_status": 400 },
     { "code": "recovery.otp_attempts_exhausted", "http_status": 429 },
     { "code": "recovery.material_unavailable", "http_status": 503 },
+    { "code": "recovery.owner_unavailable", "http_status": 409 },
+    { "code": "recovery.owner_not_ready", "http_status": 409 },
+    { "code": "recovery.owner_cancelled", "http_status": 409 },
+    { "code": "recovery.owner_expired", "http_status": 409 },
+    { "code": "recovery.device_activity_stale", "http_status": 403 },
+    { "code": "recovery.rotation_unavailable", "http_status": 409 },
+    { "code": "recovery.rotation_incomplete", "http_status": 409 },
+    { "code": "recovery.generation_mismatch", "http_status": 409 },
+    { "code": "recovery.rekey_required", "http_status": 409 },
     { "code": "service.temporarily_unavailable", "http_status": 503 }
   ]
 }

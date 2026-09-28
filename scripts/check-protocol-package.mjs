@@ -23,8 +23,12 @@ const forbiddenKeys = new Set([
 const recoverySecretPaths = new Set([
   "schemas/recovery-record-provision-response.schema.json",
   "schemas/recovery-secret-response.schema.json",
+  "schemas/owner-recovery-secret-response.schema.json",
+  "schemas/recovery-rotation-provision-response.schema.json",
   "fixtures/valid/recovery-record-provision-response.json",
   "fixtures/valid/recovery-secret-response.json",
+  "fixtures/valid/owner-recovery-secret-response.json",
+  "fixtures/valid/recovery-rotation-provision-response.json",
 ]);
 
 function inspectKeys(value, path, sourcePath = path) {

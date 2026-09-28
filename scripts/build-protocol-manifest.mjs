@@ -61,8 +61,8 @@ for (const path of paths) {
 const unsignedManifest = {
   manifest_version: 1,
   protocol_version: 1,
-  release: "1.2.0",
-  release_tag: "protocol-v1.2.0",
+  release: "1.3.0",
+  release_tag: "protocol-v1.3.0",
   files,
 };
 const manifest = {

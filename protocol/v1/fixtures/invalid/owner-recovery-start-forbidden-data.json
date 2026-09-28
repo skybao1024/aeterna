@@ -1,0 +1,20 @@
+{
+  "protocol_version": 1,
+  "signed": {
+    "account_id": "00000000-0000-4000-8000-000000000020",
+    "canonicalization": "jcs-rfc8785",
+    "device_id": "00000000-0000-4000-8000-000000000003",
+    "domain": "aeterna.owner-recovery.start.v1",
+    "operation": "owner_recovery.start",
+    "policy_epoch": 1,
+    "protocol_version": 1,
+    "recovery_generation": 1,
+    "recovery_id": "00000000-0000-4000-8000-000000000041",
+    "request_id": "00000000-0000-4000-8000-000000000050",
+    "signature_version": 1,
+    "vault_id": "00000000-0000-4000-8000-000000000042",
+    "wrapper_digest": "ZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmY",
+    "erc": "forbidden"
+  },
+  "signature": "Aesn_0t8v5yo6ONADWZUQVV09-fpP2DBDq86wNJgznwvO3VAQuhqj2Gco_-9tA65fDGpYjRmMofmAQwm9WKgBA"
+}

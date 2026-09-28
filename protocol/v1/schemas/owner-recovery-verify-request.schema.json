@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:aeterna:protocol:v1:owner-recovery-verify-request",
+  "additionalProperties": false,
+  "properties": {
+    "protocol_version": { "$ref": "common.schema.json#/$defs/protocolVersion" },
+    "request_id": { "$ref": "common.schema.json#/$defs/uuid" },
+    "owner_recovery_id": { "$ref": "common.schema.json#/$defs/uuid" },
+    "challenge_id": { "$ref": "common.schema.json#/$defs/uuid" },
+    "code": { "$ref": "common.schema.json#/$defs/otp8" }
+  },
+  "required": [
+    "protocol_version",
+    "request_id",
+    "owner_recovery_id",
+    "challenge_id",
+    "code"
+  ],
+  "type": "object"
+}

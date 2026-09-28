@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:aeterna:protocol:v1:owner-recovery-response",
+  "additionalProperties": false,
+  "properties": {
+    "protocol_version": { "$ref": "common.schema.json#/$defs/protocolVersion" },
+    "request_id": { "$ref": "common.schema.json#/$defs/uuid" },
+    "data": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": { "$ref": "common.schema.json#/$defs/uuid" },
+        "challenge_id": { "$ref": "common.schema.json#/$defs/uuid" },
+        "cooldown_seconds": { "const": 86400, "type": "integer" },
+        "device_id": { "$ref": "common.schema.json#/$defs/uuid" },
+        "expires_at": { "$ref": "common.schema.json#/$defs/timestamp" },
+        "owner_recovery_id": { "$ref": "common.schema.json#/$defs/uuid" },
+        "ready_at": { "$ref": "common.schema.json#/$defs/timestamp" },
+        "rekey_required": { "type": "boolean" },
+        "state": { "$ref": "common.schema.json#/$defs/ownerRecoveryState" }
+      },
+      "required": [
+        "account_id",
+        "challenge_id",
+        "cooldown_seconds",
+        "device_id",
+        "expires_at",
+        "owner_recovery_id",
+        "rekey_required",
+        "state"
+      ],
+      "type": "object"
+    }
+  },
+  "required": ["protocol_version", "request_id", "data"],
+  "type": "object"
+}

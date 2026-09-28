@@ -38,6 +38,20 @@ const recoveryClaimVerifyResponsePath = `${protocolDirectory}fixtures/valid/reco
 const recoverySecretRequestPath = `${protocolDirectory}fixtures/valid/recovery-secret-request.json`;
 const recoverySecretResponsePath = `${protocolDirectory}fixtures/valid/recovery-secret-response.json`;
 const recoveryProvisionForbiddenPath = `${protocolDirectory}fixtures/invalid/recovery-record-provision-forbidden-data.json`;
+const ownerRecoveryStartSignaturePath = `${protocolDirectory}fixtures/signatures/owner-recovery-start.json`;
+const ownerRecoveryStartPath = `${protocolDirectory}fixtures/valid/owner-recovery-start-request.json`;
+const ownerRecoveryVerifyPath = `${protocolDirectory}fixtures/valid/owner-recovery-verify-request.json`;
+const ownerRecoveryActionSignaturePath = `${protocolDirectory}fixtures/signatures/owner-recovery-action.json`;
+const ownerRecoveryActionPath = `${protocolDirectory}fixtures/valid/owner-recovery-action-request.json`;
+const ownerRecoveryResponsePath = `${protocolDirectory}fixtures/valid/owner-recovery-response.json`;
+const ownerRecoverySecretResponsePath = `${protocolDirectory}fixtures/valid/owner-recovery-secret-response.json`;
+const ownerRecoveryForbiddenPath = `${protocolDirectory}fixtures/invalid/owner-recovery-start-forbidden-data.json`;
+const rotationProvisionSignaturePath = `${protocolDirectory}fixtures/signatures/recovery-rotation-provision.json`;
+const rotationProvisionPath = `${protocolDirectory}fixtures/valid/recovery-rotation-provision-request.json`;
+const rotationConfirmSignaturePath = `${protocolDirectory}fixtures/signatures/recovery-rotation-confirm.json`;
+const rotationConfirmPath = `${protocolDirectory}fixtures/valid/recovery-rotation-confirm-request.json`;
+const rotationProvisionResponsePath = `${protocolDirectory}fixtures/valid/recovery-rotation-provision-response.json`;
+const rotationResponsePath = `${protocolDirectory}fixtures/valid/recovery-rotation-response.json`;
 const checkOnly = process.argv.includes("--check");
 
 function canonicalize(value) {
@@ -346,6 +360,16 @@ const syntheticSrs = base64url(Buffer.alloc(32, 0x55));
 const syntheticWrapperDigest = base64url(Buffer.alloc(32, 0x66));
 const syntheticClaimLinkToken = base64url(Buffer.alloc(32, 0x77));
 const syntheticClaimToken = base64url(Buffer.alloc(32, 0x88));
+const ownerRecoveryIds = {
+  ownerRecovery: "00000000-0000-4000-8000-000000000050",
+  challenge: "00000000-0000-4000-8000-000000000051",
+  verifyRequest: "00000000-0000-4000-8000-000000000052",
+  actionRequest: "00000000-0000-4000-8000-000000000053",
+  rotation: "00000000-0000-4000-8000-000000000054",
+  targetRecovery: "00000000-0000-4000-8000-000000000055",
+  provisionRequest: "00000000-0000-4000-8000-000000000056",
+  confirmRequest: "00000000-0000-4000-8000-000000000057",
+};
 
 function signedRecoveryFixture(document) {
   const canonical = Buffer.from(canonicalize(document), "utf8");
@@ -473,7 +497,10 @@ const recoverySecretResponseFixture = pretty({
   data: {
     account_id: heartbeatDocument.account_id,
     device_id: heartbeatDocument.device_id,
+    policy_epoch: 1,
+    recovery_generation: 1,
     recovery_id: recoveryIds.recovery,
+    rekey_required: true,
     srs: syntheticSrs,
     vault_id: recoveryIds.vault,
     wrapper_digest: syntheticWrapperDigest,
@@ -484,6 +511,164 @@ const recoveryProvisionForbiddenFixture = pretty({
   signed: {
     ...recoveryProvisionDocument,
     vault_content: "forbidden",
+  },
+});
+
+const ownerRecoveryStartDocument = {
+  account_id: heartbeatDocument.account_id,
+  canonicalization: "jcs-rfc8785",
+  device_id: heartbeatDocument.device_id,
+  domain: "aeterna.owner-recovery.start.v1",
+  operation: "owner_recovery.start",
+  policy_epoch: 1,
+  protocol_version: 1,
+  recovery_generation: 1,
+  recovery_id: recoveryIds.recovery,
+  request_id: ownerRecoveryIds.ownerRecovery,
+  signature_version: 1,
+  vault_id: recoveryIds.vault,
+  wrapper_digest: syntheticWrapperDigest,
+};
+const ownerRecoveryStart = signedRecoveryFixture(ownerRecoveryStartDocument);
+const ownerRecoveryVerifyFixture = pretty({
+  protocol_version: 1,
+  request_id: ownerRecoveryIds.verifyRequest,
+  owner_recovery_id: ownerRecoveryIds.ownerRecovery,
+  challenge_id: ownerRecoveryIds.challenge,
+  code: "12345678",
+});
+const ownerRecoveryActionDocument = {
+  account_id: heartbeatDocument.account_id,
+  action: "release",
+  canonicalization: "jcs-rfc8785",
+  device_id: heartbeatDocument.device_id,
+  domain: "aeterna.owner-recovery.action.v1",
+  operation: "owner_recovery.action",
+  owner_recovery_id: ownerRecoveryIds.ownerRecovery,
+  protocol_version: 1,
+  recovery_id: recoveryIds.recovery,
+  request_id: ownerRecoveryIds.actionRequest,
+  signature_version: 1,
+  vault_id: recoveryIds.vault,
+  wrapper_digest: syntheticWrapperDigest,
+};
+const ownerRecoveryAction = signedRecoveryFixture(ownerRecoveryActionDocument);
+const ownerRecoveryResponseFixture = pretty({
+  protocol_version: 1,
+  request_id: ownerRecoveryIds.verifyRequest,
+  data: {
+    account_id: heartbeatDocument.account_id,
+    challenge_id: ownerRecoveryIds.challenge,
+    cooldown_seconds: 86400,
+    device_id: heartbeatDocument.device_id,
+    expires_at: "2030-01-04T03:04:05Z",
+    owner_recovery_id: ownerRecoveryIds.ownerRecovery,
+    ready_at: "2030-01-03T03:04:05Z",
+    rekey_required: false,
+    state: "cooling_down",
+  },
+});
+const ownerRecoverySecretResponseFixture = pretty({
+  protocol_version: 1,
+  request_id: ownerRecoveryIds.actionRequest,
+  data: {
+    account_id: heartbeatDocument.account_id,
+    device_id: heartbeatDocument.device_id,
+    owner_recovery_id: ownerRecoveryIds.ownerRecovery,
+    policy_epoch: 1,
+    recovery_generation: 1,
+    recovery_id: recoveryIds.recovery,
+    rekey_required: false,
+    srs: syntheticSrs,
+    vault_id: recoveryIds.vault,
+    wrapper_digest: syntheticWrapperDigest,
+  },
+});
+const ownerRecoveryForbiddenFixture = pretty({
+  ...ownerRecoveryStart.envelope,
+  signed: {
+    ...ownerRecoveryStartDocument,
+    erc: "forbidden",
+  },
+});
+
+const rotationProvisionDocument = {
+  account_id: heartbeatDocument.account_id,
+  canonicalization: "jcs-rfc8785",
+  device_id: heartbeatDocument.device_id,
+  domain: "aeterna.recovery-rotation.provision.v1",
+  kind: "post_compromise",
+  operation: "recovery_rotation.provision",
+  owner_recovery_id: ownerRecoveryIds.ownerRecovery,
+  protocol_version: 1,
+  recovery_id: ownerRecoveryIds.targetRecovery,
+  request_id: ownerRecoveryIds.provisionRequest,
+  rotation_id: ownerRecoveryIds.rotation,
+  signature_version: 1,
+  source_generation: 1,
+  source_policy_epoch: 1,
+  target_generation: 2,
+  target_policy_epoch: 2,
+  vault_id: recoveryIds.vault,
+};
+const rotationProvision = signedRecoveryFixture(rotationProvisionDocument);
+const rotationConfirmDocument = {
+  account_id: heartbeatDocument.account_id,
+  canonicalization: "jcs-rfc8785",
+  device_id: heartbeatDocument.device_id,
+  domain: "aeterna.recovery-rotation.confirm.v1",
+  operation: "recovery_rotation.confirm",
+  protocol_version: 1,
+  recovery_id: ownerRecoveryIds.targetRecovery,
+  request_id: ownerRecoveryIds.confirmRequest,
+  rotation_id: ownerRecoveryIds.rotation,
+  signature_version: 1,
+  target_generation: 2,
+  target_policy_epoch: 1,
+  vault_id: recoveryIds.vault,
+  wrapper_digest: syntheticWrapperDigest,
+};
+const rotationConfirm = signedRecoveryFixture(rotationConfirmDocument);
+const rotationProvisionResponseFixture = pretty({
+  protocol_version: 1,
+  request_id: ownerRecoveryIds.provisionRequest,
+  data: {
+    account_id: heartbeatDocument.account_id,
+    device_id: heartbeatDocument.device_id,
+    expires_at: "2030-01-03T03:04:05Z",
+    recovery_id: ownerRecoveryIds.targetRecovery,
+    rotation_id: ownerRecoveryIds.rotation,
+    srs: syntheticSrs,
+    target_generation: 2,
+    target_policy_epoch: 1,
+    vault_id: recoveryIds.vault,
+  },
+});
+const rotationResponseFixture = pretty({
+  protocol_version: 1,
+  request_id: ownerRecoveryIds.confirmRequest,
+  data: {
+    account_id: heartbeatDocument.account_id,
+    complete: false,
+    devices: [
+      {
+        device_id: heartbeatDocument.device_id,
+        device_label: "Owner Mac",
+        state: "complete",
+        updated_at: "2030-01-02T03:04:05Z",
+      },
+      {
+        device_id: "00000000-0000-4000-8000-000000000004",
+        device_label: "Travel Mac",
+        state: "pending",
+        updated_at: "2030-01-02T03:04:05Z",
+      },
+    ],
+    kind: "erc_rotation",
+    rotation_id: ownerRecoveryIds.rotation,
+    state: "active",
+    target_generation: 2,
+    target_policy_epoch: 1,
   },
 });
 
@@ -551,6 +736,44 @@ await updateOrCheck(
   recoveryProvisionForbiddenPath,
   recoveryProvisionForbiddenFixture,
 );
+await updateOrCheck(
+  ownerRecoveryStartSignaturePath,
+  ownerRecoveryStart.signatureFixture,
+);
+await updateOrCheck(
+  ownerRecoveryStartPath,
+  pretty(ownerRecoveryStart.envelope),
+);
+await updateOrCheck(ownerRecoveryVerifyPath, ownerRecoveryVerifyFixture);
+await updateOrCheck(
+  ownerRecoveryActionSignaturePath,
+  ownerRecoveryAction.signatureFixture,
+);
+await updateOrCheck(
+  ownerRecoveryActionPath,
+  pretty(ownerRecoveryAction.envelope),
+);
+await updateOrCheck(ownerRecoveryResponsePath, ownerRecoveryResponseFixture);
+await updateOrCheck(
+  ownerRecoverySecretResponsePath,
+  ownerRecoverySecretResponseFixture,
+);
+await updateOrCheck(ownerRecoveryForbiddenPath, ownerRecoveryForbiddenFixture);
+await updateOrCheck(
+  rotationProvisionSignaturePath,
+  rotationProvision.signatureFixture,
+);
+await updateOrCheck(rotationProvisionPath, pretty(rotationProvision.envelope));
+await updateOrCheck(
+  rotationConfirmSignaturePath,
+  rotationConfirm.signatureFixture,
+);
+await updateOrCheck(rotationConfirmPath, pretty(rotationConfirm.envelope));
+await updateOrCheck(
+  rotationProvisionResponsePath,
+  rotationProvisionResponseFixture,
+);
+await updateOrCheck(rotationResponsePath, rotationResponseFixture);
 console.log(
   checkOnly
     ? "Verified generated protocol signature fixtures."

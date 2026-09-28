@@ -1,0 +1,26 @@
+{
+  "fixture_version": 1,
+  "seed": "ERERERERERERERERERERERERERERERERERERERERERE",
+  "public_key": "0EqyMnQrtKs6E2i9RhXk5tAiSrcaAWuvhSCjMsl3hzc",
+  "canonical_bytes": "eyJhY2NvdW50X2lkIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDIwIiwiY2Fub25pY2FsaXphdGlvbiI6Impjcy1yZmM4Nzg1IiwiZGV2aWNlX2lkIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDAzIiwiZG9tYWluIjoiYWV0ZXJuYS5yZWNvdmVyeS1yb3RhdGlvbi5wcm92aXNpb24udjEiLCJraW5kIjoicG9zdF9jb21wcm9taXNlIiwib3BlcmF0aW9uIjoicmVjb3Zlcnlfcm90YXRpb24ucHJvdmlzaW9uIiwib3duZXJfcmVjb3ZlcnlfaWQiOiIwMDAwMDAwMC0wMDAwLTQwMDAtODAwMC0wMDAwMDAwMDAwNTAiLCJwcm90b2NvbF92ZXJzaW9uIjoxLCJyZWNvdmVyeV9pZCI6IjAwMDAwMDAwLTAwMDAtNDAwMC04MDAwLTAwMDAwMDAwMDA1NSIsInJlcXVlc3RfaWQiOiIwMDAwMDAwMC0wMDAwLTQwMDAtODAwMC0wMDAwMDAwMDAwNTYiLCJyb3RhdGlvbl9pZCI6IjAwMDAwMDAwLTAwMDAtNDAwMC04MDAwLTAwMDAwMDAwMDA1NCIsInNpZ25hdHVyZV92ZXJzaW9uIjoxLCJzb3VyY2VfZ2VuZXJhdGlvbiI6MSwic291cmNlX3BvbGljeV9lcG9jaCI6MSwidGFyZ2V0X2dlbmVyYXRpb24iOjIsInRhcmdldF9wb2xpY3lfZXBvY2giOjIsInZhdWx0X2lkIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDQyIn0",
+  "signature": "Ae7GlQPGuc8mxipOxOlMgDtkbGasqzIS9Cx9VkXREtH8Q8COI2t_SQz-8bkT0serQaxjGW9EWOWQ6eaK6zLjCQ",
+  "document": {
+    "account_id": "00000000-0000-4000-8000-000000000020",
+    "canonicalization": "jcs-rfc8785",
+    "device_id": "00000000-0000-4000-8000-000000000003",
+    "domain": "aeterna.recovery-rotation.provision.v1",
+    "kind": "post_compromise",
+    "operation": "recovery_rotation.provision",
+    "owner_recovery_id": "00000000-0000-4000-8000-000000000050",
+    "protocol_version": 1,
+    "recovery_id": "00000000-0000-4000-8000-000000000055",
+    "request_id": "00000000-0000-4000-8000-000000000056",
+    "rotation_id": "00000000-0000-4000-8000-000000000054",
+    "signature_version": 1,
+    "source_generation": 1,
+    "source_policy_epoch": 1,
+    "target_generation": 2,
+    "target_policy_epoch": 2,
+    "vault_id": "00000000-0000-4000-8000-000000000042"
+  }
+}

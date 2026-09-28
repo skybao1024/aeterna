@@ -247,7 +247,8 @@ Owner 将以下内容保存到纸张、U 盘、保险柜或密封信封：
 7. 联系人在本地 Aeterna 中进入“紧急恢复”。
 8. 联系人通过通知链接和邮箱 OTP 取得短期 Claim Token。
 9. 本地应用使用 Claim Token 向服务端领取该设备对应的 SRS。
-10. 应用使用 ERC + SRS 解开本地 VDK，展示保险箱内容。
+10. 应用使用 ERC + SRS 解开旧 VDK，但在展示普通内容前强制设置新主密码、
+    生成新 ERC/SRS/VDK，并原子重新加密全部本地记录。
 
 ## 6. Activity detection and heartbeat
 
@@ -432,6 +433,12 @@ RELEASED
 - `PRE_WARNING` 和 `GRACE_PERIOD` 中收到任何有效心跳，立即回到 `ACTIVE` 并重新计算期限。
 - Owner 可在最终释放前通过已认证设备或账户页面暂停/重置流程。
 - `RELEASED` 是安全边界；SRS 可能已被领取，系统不能声称能够撤回。
+- Policy history is epoch-scoped. A released epoch remains immutable and
+  terminal; a successfully rekeyed device creates a distinct current `ACTIVE`
+  successor epoch instead of resetting the released row.
+- A signed heartbeat for a historical released epoch may update only replay-
+  protected device presence. It cannot change the released state, deadlines,
+  grants, or notification evidence.
 - 所有状态转换使用数据库事务和 compare-and-set 条件。
 - 状态转换与通知任务通过 Transactional Outbox 同一事务写入。
 - Every email operation uses a stable idempotency key so retries cannot create
@@ -520,21 +527,34 @@ Owner 忘记 MP 时不能通过普通邮箱验证码直接重置保险箱，否�
 
 允许的自助恢复流程为：
 
-1. 必须从仍然绑定、最近提交过有效心跳的设备发起；
+1. 必须从仍然绑定、最近 15 分钟内提交过有效签名心跳的设备发起；
 2. 设备使用本地私钥签名 Owner Recovery 请求；
 3. Owner 完成邮箱 OTP 等二次认证；
 4. 服务端向全部 Owner 渠道发送安全通知并进入至少 24 小时冷静期；
-5. 冷静期内未被取消，服务端只向发起设备释放其对应 SRS；
+5. 冷静期内任一 active bound device 均可签名取消；否则服务端只向发起设备
+   释放其对应 SRS，并只在随后 24 小时内向同一最近活跃设备允许有界重取；
 6. Owner 输入 ERC 解锁 VDK；
-7. 应用强制设置新 MP，并轮换该设备的 SRS 和 Recovery Wrapper。
+7. 应用强制设置新 MP、生成新 ERC，并轮换该设备的 SRS 和 Recovery Wrapper。
 
 如果 MP 和 ERC 同时丢失，或者既无法使用已绑定设备又无法通过账户验证，Aeterna 无法恢复本地数据。人工客服只能处理付费权益或账户元数据，不能绕过密码学边界。
 
 ### 8.6 轮换与释放后的处理
 
-- Owner 可以在释放前轮换 ERC；旧 SRS 必须被服务端撤销。
-- 多设备轮换时，所有设备必须重新建立 Recovery Wrapper；UI 显示未完成设备。
+- Owner 可以在释放前轮换 ERC。发起设备确认 target generation 的第一个
+  wrapper 时，服务端原子激活新 generation 并撤销旧 generation 的所有在线
+  SRS 授权。
+- 多设备轮换时，每个 active device 都有 `pending`、`not_enrolled`、
+  `complete` 或 `excluded` 状态；每台 eligible device 必须使用共享的新 ERC、
+  独立的新 SRS 和 Recovery Record 重新建立 Recovery Wrapper，且 UI 不得把
+  partial 报告为 fully protected。
 - 已经 `RELEASED` 或任一 Recovery Grant 已经 `CLAIMED` 后，如果 Owner 重新出现，必须生成新 VDK 并重新加密本地数据，才能保护新的数据版本。
+- Post-compromise rearming additionally requires a signed bound-device request
+  and Owner mailbox OTP. It has no second 24-hour delay because it releases no
+  old SRS; the new SRS is scoped only to the proposed successor epoch.
+- The local rekey runs in one SQLite immediate transaction: every bounded item
+  and embedded attachment record is authenticated, decrypted, generation-
+  incremented, and re-encrypted under the fresh VDK; both wrappers, header
+  authentication, and the complete fresh nonce ledger commit together.
 - 已经被联系人复制的旧密文、ERC 和 SRS 无法远程收回。
 
 ## 9. 多设备与本地备份
@@ -752,6 +772,15 @@ submit arbitrary states.
 Payment and entitlement state use separate tables. The service must not trust a
 client-local `is_pro` or equivalent entitlement flag.
 
+The illustrative tables above omit the normalized recovery tables used by the
+implementation. Each account stores its current policy epoch and recovery
+generation; `account_policies` is unique by `(account_id, epoch)` with at most
+one non-retired current row. Recovery records bind the exact epoch, generation,
+device, Vault, and wrapper digest. Owner recovery requests, rotation batches,
+and per-device rotation rows retain closed states and redacted audit/Outbox
+references. Historical released epochs and their grants are never rewritten as
+active successor state.
+
 ### 11.3 心跳存储最小化
 
 - 账户表只保存聚合后的最后活动时间。
@@ -777,7 +806,10 @@ POST   /v1/recovery/claim/start
 POST   /v1/recovery/claim/verify
 POST   /v1/recovery/{id}/release-secret
 POST   /v1/recovery/owner/start
-POST   /v1/recovery/owner/confirm
+POST   /v1/recovery/owner/verify
+POST   /v1/recovery/owner/{id}/action
+POST   /v1/recovery/rotations/provision
+POST   /v1/recovery/rotations/{id}/confirm
 POST   /v1/billing/webhook
 DELETE /v1/account
 ```
@@ -1050,6 +1082,12 @@ fuzzing, and penetration review before release. 禁止使用已弃用的
 - 主密码修改不需要重新加密 Vault 内容。
 - ERC 轮换使旧 SRS/Wrapper 失效。
 - Owner 自助恢复必须满足绑定设备签名、二次认证和冷静期。
+- Owner cancellation and SRS release contend on one locked request row, so one
+  terminal result wins and a committed cancellation cannot decrypt SRS.
+- Interrupted whole-Vault rekey leaves the complete old Vault; committed rekey
+  leaves every item and embedded attachment readable only through new factors.
+- A released policy epoch remains immutable after successor activation, and
+  incomplete devices remain explicitly visible until their own rekey confirms.
 
 ### 18.5 备份与恢复
 

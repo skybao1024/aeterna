@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:aeterna:protocol:v1:owner-recovery-action-request",
+  "additionalProperties": false,
+  "properties": {
+    "protocol_version": { "$ref": "common.schema.json#/$defs/protocolVersion" },
+    "signed": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "action": { "enum": ["release", "complete"] }
+            },
+            "required": ["action"]
+          },
+          "then": {
+            "required": ["recovery_id", "vault_id", "wrapper_digest"]
+          },
+          "else": {
+            "not": {
+              "anyOf": [
+                { "required": ["recovery_id"] },
+                { "required": ["vault_id"] },
+                { "required": ["wrapper_digest"] }
+              ]
+            }
+          }
+        }
+      ],
+      "properties": {
+        "account_id": { "$ref": "common.schema.json#/$defs/uuid" },
+        "action": {
+          "enum": ["cancel", "release", "complete", "status"],
+          "type": "string"
+        },
+        "canonicalization": {
+          "$ref": "common.schema.json#/$defs/canonicalization"
+        },
+        "device_id": { "$ref": "common.schema.json#/$defs/uuid" },
+        "domain": {
+          "const": "aeterna.owner-recovery.action.v1",
+          "type": "string"
+        },
+        "operation": { "const": "owner_recovery.action", "type": "string" },
+        "owner_recovery_id": { "$ref": "common.schema.json#/$defs/uuid" },
+        "protocol_version": {
+          "$ref": "common.schema.json#/$defs/protocolVersion"
+        },
+        "recovery_id": { "$ref": "common.schema.json#/$defs/uuid" },
+        "request_id": { "$ref": "common.schema.json#/$defs/uuid" },
+        "signature_version": {
+          "$ref": "common.schema.json#/$defs/signatureVersion"
+        },
+        "vault_id": { "$ref": "common.schema.json#/$defs/uuid" },
+        "wrapper_digest": { "$ref": "common.schema.json#/$defs/base64url32" }
+      },
+      "required": [
+        "account_id",
+        "action",
+        "canonicalization",
+        "device_id",
+        "domain",
+        "operation",
+        "owner_recovery_id",
+        "protocol_version",
+        "request_id",
+        "signature_version"
+      ],
+      "type": "object"
+    },
+    "signature": { "$ref": "common.schema.json#/$defs/base64url64" }
+  },
+  "required": ["protocol_version", "signed", "signature"],
+  "type": "object"
+}

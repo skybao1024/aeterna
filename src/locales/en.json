@@ -14,6 +14,24 @@
     "checking": "Checking the local vault…",
     "unavailable": "The local vault is unavailable in this environment."
   },
+  "recovery": {
+    "heading": "Recovery protection",
+    "readyAt": "Release becomes eligible at {{date}}.",
+    "deviceList": "Recovery protection by device",
+    "states": {
+      "not_configured": "Delayed recovery is not connected in this local preview. Losing the master password still loses access.",
+      "cooling_down": "Owner recovery is in its cancellable cooling-down period.",
+      "rekey_required": "Recovered data must be re-encrypted with a new VDK and new factors before normal access.",
+      "partial": "The new recovery generation is active, but not all devices are protected.",
+      "protected": "Recovery protection is confirmed on every eligible device."
+    },
+    "deviceStates": {
+      "pending": "Pending",
+      "not_enrolled": "Not enrolled",
+      "complete": "Complete",
+      "excluded": "Excluded"
+    }
+  },
   "setup": {
     "title": "Create a local vault",
     "description": "Choose a master password to protect encrypted notes, instructions, and bounded attachments on this device.",

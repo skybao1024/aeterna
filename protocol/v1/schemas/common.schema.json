@@ -33,7 +33,33 @@
       "type": "string"
     },
     "recoveryRecordState": {
-      "enum": ["pending_confirmation", "sealed", "abandoned", "expired"],
+      "enum": [
+        "pending_confirmation",
+        "sealed",
+        "abandoned",
+        "expired",
+        "revoked"
+      ],
+      "type": "string"
+    },
+    "ownerRecoveryState": {
+      "enum": [
+        "pending_email",
+        "cooling_down",
+        "ready",
+        "material_released",
+        "completed",
+        "cancelled",
+        "expired"
+      ],
+      "type": "string"
+    },
+    "rotationKind": {
+      "enum": ["erc_rotation", "post_compromise"],
+      "type": "string"
+    },
+    "rotationDeviceState": {
+      "enum": ["pending", "not_enrolled", "complete", "excluded"],
       "type": "string"
     },
     "heartbeatSequence": {
